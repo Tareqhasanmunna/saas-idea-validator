@@ -1,0 +1,13 @@
+praw
+textblob
+pandas
+numpy
+scikit-learn
+transformers
+torch
+stable-baselines3
+flask
+fastapi
+uvicorn
+pyyaml
+joblib
