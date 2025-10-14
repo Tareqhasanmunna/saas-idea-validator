@@ -1,14 +1,28 @@
 # Python
 __pycache__/
 *.pyc
+*.pyo
+*.pyd
 
-# Virtual env
+# Virtual environment
 venv/
+env/
+.venv/
 
-# Data
+# Data files
 data/raw/
 data/processed/
-data/models/
 
-#hide keys
-.env
+# Config / secrets
+*.env
+config.yaml
+
+# Jupyter notebooks checkpoints
+.ipynb_checkpoints/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db

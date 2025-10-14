@@ -1,9 +1,8 @@
 praw
-textblob
 pandas
 numpy
 scikit-learn
-transformers
+sentence-transformers
 torch
 stable-baselines3
 flask
@@ -12,3 +11,4 @@ uvicorn
 pyyaml
 joblib
 python-dotenv
+
