@@ -1,0 +1,14 @@
+scraper:
+  subreddit: "SaaS"
+  max_posts: 2000
+  max_comments_per_post: 20
+
+validation_weights:
+  post_sentiment: 0.3
+  avg_comment_sentiment: 0.3
+  upvote_ratio: 0.2
+  post_recency: 0.2
+
+paths:
+  raw_data_dir: "data/raw"
+  raw_data_file: "supervised_dataset.csv"

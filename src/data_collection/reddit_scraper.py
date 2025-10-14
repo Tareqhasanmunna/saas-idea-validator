@@ -5,8 +5,18 @@ from datetime import datetime, timezone
 import os
 import math
 from dotenv import load_dotenv
+import yaml
 
+# Load keys
 load_dotenv()
+
+# Load config
+with open("config.yaml") as f:
+    config = yaml.safe_load(f)
+
+scraper_cfg = config['scraper']
+weights = config['validation_weights']
+paths_cfg = config['paths']
 
 # Reddit API Authentication
 reddit = praw.Reddit(
@@ -19,8 +29,7 @@ reddit = praw.Reddit(
 def get_sentiment(text):
     if not text:
         return 0.0
-    blob = TextBlob(text)
-    return blob.sentiment.polarity
+    return TextBlob(text).sentiment.polarity
 
 # Format UTC timestamps
 def format_timestamp(utc):
@@ -34,14 +43,14 @@ def recency_weight(created_utc):
     if not created_utc:
         return 0
     days_old = (datetime.now(timezone.utc) - datetime.fromtimestamp(created_utc, timezone.utc)).days
-    return math.exp(-days_old / 30)  # decay over ~1 month
+    return math.exp(-days_old / 30)
 
 def comment_age_days(created_utc):
     if not created_utc:
         return None
     return (datetime.now(timezone.utc) - datetime.fromtimestamp(created_utc, timezone.utc)).days
 
-# Fetch posts + calculate validation
+# Fetch posts
 def fetch_subreddit_posts(subreddit_name, max_posts=2000):
     subreddit = reddit.subreddit(subreddit_name)
     data_records = []
@@ -56,7 +65,7 @@ def fetch_subreddit_posts(subreddit_name, max_posts=2000):
         num_comments = submission.num_comments
         upvote_ratio = getattr(submission, "upvote_ratio", 0.5)
 
-        # Post sentiment
+        # Post sentiment and recency
         post_sentiment = get_sentiment(full_text)
         post_recency = recency_weight(submission.created_utc)
 
@@ -66,7 +75,7 @@ def fetch_subreddit_posts(subreddit_name, max_posts=2000):
 
         if num_comments > 0:
             submission.comments.replace_more(limit=0)
-            for comment in submission.comments.list()[:20]:
+            for comment in submission.comments.list()[:scraper_cfg['max_comments_per_post']]:
                 comment_sent = get_sentiment(comment.body or "")
                 age_days = comment_age_days(comment.created_utc)
                 comment_rec = recency_weight(comment.created_utc)
@@ -87,10 +96,10 @@ def fetch_subreddit_posts(subreddit_name, max_posts=2000):
 
         # Validation score (0–100%)
         validation_score = (
-            post_sentiment * 0.3 +
-            avg_comment_sentiment * 0.3 +
-            upvote_ratio * 0.2 +
-            post_recency * 0.2
+            post_sentiment * weights['post_sentiment'] +
+            avg_comment_sentiment * weights['avg_comment_sentiment'] +
+            upvote_ratio * weights['upvote_ratio'] +
+            post_recency * weights['post_recency']
         ) * 100
         validation_score = max(0, min(100, validation_score))
 
@@ -121,30 +130,26 @@ def fetch_subreddit_posts(subreddit_name, max_posts=2000):
             "source_url": f"https://reddit.com{submission.permalink}"
         })
 
-        # Stop after max_posts
         if len(data_records) >= max_posts:
             break
 
     return data_records
 
 def main():
-    subreddit = "SaaS"
-    data_records = fetch_subreddit_posts(subreddit, max_posts=2000)
+    data_records = fetch_subreddit_posts(scraper_cfg['subreddit'], scraper_cfg['max_posts'])
 
     if data_records:
         df = pd.DataFrame(data_records)
-
-        # Ensure folder exists
-        os.makedirs('data/raw', exist_ok=True)
-        csv_path = 'data/raw/supervised_dataset.csv'
+        os.makedirs(paths_cfg['raw_data_dir'], exist_ok=True)
+        csv_path = os.path.join(paths_cfg['raw_data_dir'], paths_cfg['raw_data_file'])
         df.to_csv(csv_path, index=False)
 
-        print(f"\n✅ Dataset saved as {csv_path}")
-        print(f"📊 Total records: {len(df)}")
-        print("🧩 Columns:", list(df.columns))
+        print(f"\n Dataset saved as {csv_path}")
+        print(f"Total records: {len(df)}")
+        print("Columns:", list(df.columns))
         print(df.head(3))
     else:
-        print("❌ No data collected.")
+        print("No data collected.")
 
 if __name__ == "__main__":
     main()
