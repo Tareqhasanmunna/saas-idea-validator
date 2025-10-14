@@ -9,3 +9,6 @@ venv/
 data/raw/
 data/processed/
 data/models/
+
+#hide keys
+.env
