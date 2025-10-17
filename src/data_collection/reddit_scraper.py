@@ -46,10 +46,13 @@ def fetch_subreddit_posts():
     subreddit = reddit.subreddit(SUBREDDIT)
     post_generator = subreddit.new(limit=None)
     total_fetched = 0
+    estimated_total = BATCH_SIZE * MAX_BATCHES  # just for progress display
 
     for batch_number in range(1, MAX_BATCHES + 1):
         batch_records = []
-        print(f"\nFetching batch {batch_number}...")
+        start_idx = (batch_number - 1) * BATCH_SIZE + 1
+        end_idx = start_idx + BATCH_SIZE - 1
+        print(f"\nFetching batch {batch_number} ({start_idx}-{end_idx})...")
 
         while len(batch_records) < BATCH_SIZE:
             try:
@@ -120,13 +123,17 @@ def fetch_subreddit_posts():
             })
             total_fetched += 1
 
+            # Progress display
+            progress_percent = (total_fetched / estimated_total) * 100
+            print(f"Fetched post {total_fetched}/{estimated_total} ({progress_percent:.2f}%)", end="\r")
+
             # Polite random delay
             time.sleep(random.uniform(DELAY_MIN, DELAY_MAX))
 
         # Save batch
         batch_file = os.path.join(RAW_DIR, f"{RAW_FILE_PREFIX}_{batch_number}.csv")
         pd.DataFrame(batch_records).to_csv(batch_file, index=False)
-        print(f"Saved batch {batch_number} with {len(batch_records)} records.")
+        print(f"\nSaved batch {batch_number} with {len(batch_records)} records.")
 
     print(f"\nTotal posts fetched: {total_fetched}")
 
