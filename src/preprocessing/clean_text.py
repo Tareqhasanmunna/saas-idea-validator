@@ -9,6 +9,7 @@ def clean_text(text):
     - Lowercase
     - Remove URLs
     - Remove special characters
+    - Remove emoji
     - Strip extra spaces
     """
 
