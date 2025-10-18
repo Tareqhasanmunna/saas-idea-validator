@@ -1,0 +1,16 @@
+scraper:
+  subreddit: "SaaS"
+  batch_size: 1000
+  max_batches: 5
+  max_comments_per_post: 10
+  delay_min: 1.0
+  delay_max: 3.0
+  retry_wait: 30
+
+paths:
+  raw_data_dir: "data/raw/raw_batch"
+  raw_data_file: "reddit_data_batch"
+
+validation_thresholds:
+  good: 70
+  neutral: 40
