@@ -1,7 +1,7 @@
 scraper:
   subreddit: "SaaS"
-  batch_size: 1000
-  max_batches: 5
+  batch_size: 100
+  max_batches: 10
   max_comments_per_post: 10
   delay_min: 1.0
   delay_max: 3.0
