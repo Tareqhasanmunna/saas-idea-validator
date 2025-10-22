@@ -21,7 +21,7 @@ for file in csv_files:
 merged_df = pd.concat(dataframes, ignore_index=True)
 
 # Drop duplicate rows
-merged_df.drop_duplicates(inplace=True)
+merged_df.drop_duplicates(subset=['title', 'text'], inplace=True)
 
 # Save merged file
 output_file = os.path.join(store_path, "merged_output.csv")
