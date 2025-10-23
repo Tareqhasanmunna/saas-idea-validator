@@ -11,4 +11,6 @@ uvicorn
 pyyaml
 joblib
 python-dotenv
+emoji
+nltk
 
