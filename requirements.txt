@@ -1,0 +1,14 @@
+praw
+pandas
+numpy
+scikit-learn
+sentence-transformers
+torch
+stable-baselines3
+flask
+fastapi
+uvicorn
+pyyaml
+joblib
+python-dotenv
+huggingface-hub[hf_xet]
