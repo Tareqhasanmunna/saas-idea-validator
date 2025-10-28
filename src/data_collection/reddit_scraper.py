@@ -7,18 +7,19 @@ from dotenv import load_dotenv
 import yaml
 import sys
 
-# Add project root to path for helpers import
+# Add project root for relative imports (helpers)
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 from utils.helpers import format_timestamp, recency_weight, age_in_days
 
+# Load environment variables
 load_dotenv()
 
-# Load config
+# Load config.yaml
 with open(os.path.join(os.path.dirname(__file__), '../../config.yaml'), "r") as f:
     config = yaml.safe_load(f)
 
 # Config variables
-SUBREDDIT = config['scraper']['subreddit']
+SUBREDDITS = config['scraper']['subreddits']
 BATCH_SIZE = config['scraper']['batch_size']
 MAX_BATCHES = config['scraper']['max_batches']
 MAX_COMMENTS = config['scraper']['max_comments_per_post']
@@ -41,12 +42,15 @@ reddit = praw.Reddit(
     user_agent=os.getenv("REDDIT_USER_AGENT")
 )
 
-# Scraper function
-def fetch_subreddit_posts():
-    subreddit = reddit.subreddit(SUBREDDIT)
+# Combine multiple subreddits e.g. Entrepreneur+startups+indiehackers
+COMBINED_SUBS = "+".join(SUBREDDITS)
+
+
+def fetch_multi_subreddit_posts():
+    subreddit = reddit.subreddit(COMBINED_SUBS)
     post_generator = subreddit.new(limit=None)
     total_fetched = 0
-    estimated_total = BATCH_SIZE * MAX_BATCHES  # just for progress display
+    estimated_total = BATCH_SIZE * MAX_BATCHES
 
     for batch_number in range(1, MAX_BATCHES + 1):
         batch_records = []
@@ -65,7 +69,7 @@ def fetch_subreddit_posts():
                 time.sleep(RETRY_WAIT)
                 continue
 
-            # Post data
+            # Extract post details
             title = submission.title or ""
             post_body = submission.selftext or ""
             full_text = f"{title} {post_body}".strip()
@@ -75,7 +79,7 @@ def fetch_subreddit_posts():
             post_rec = recency_weight(submission.created_utc)
             post_age = age_in_days(submission.created_utc)
 
-            # Comment recency weights
+            # Fetch recent comments
             comment_rec_weights = []
             if num_comments > 0:
                 submission.comments.replace_more(limit=0)
@@ -84,11 +88,9 @@ def fetch_subreddit_posts():
                     comment_rec_weights.append(recency_weight(comment.created_utc))
 
             avg_comment_rec = sum(comment_rec_weights) / len(comment_rec_weights) if comment_rec_weights else 0
+            post_sentiment = 0.5  # Placeholder sentiment (ML can be integrated later)
 
-            # Placeholder sentiment (replace with ML later)
-            post_sentiment = 0.5
-
-            # Validation score
+            # Calculate validation score
             validation_score = (
                 0.3 * post_sentiment +
                 0.3 * avg_comment_rec +
@@ -97,7 +99,7 @@ def fetch_subreddit_posts():
             ) * 100
             validation_score = max(0, min(100, validation_score))
 
-            # Final label
+            # Determine label
             if validation_score >= GOOD_THRESHOLD:
                 label = "good"
             elif validation_score >= NEUTRAL_THRESHOLD:
@@ -108,6 +110,7 @@ def fetch_subreddit_posts():
             # Append record
             batch_records.append({
                 "post_id": submission.id,
+                "subreddit": submission.subreddit.display_name,
                 "title": title,
                 "text": full_text,
                 "author": submission.author.name if submission.author else '[deleted]',
@@ -121,21 +124,21 @@ def fetch_subreddit_posts():
                 "label": label,
                 "source_url": f"https://reddit.com{submission.permalink}"
             })
-            total_fetched += 1
 
-            # Progress display
+            total_fetched += 1
             progress_percent = (total_fetched / estimated_total) * 100
             print(f"Fetched post {total_fetched}/{estimated_total} ({progress_percent:.2f}%)", end="\r")
 
-            # Polite random delay
+            # Respect Reddit's API limits
             time.sleep(random.uniform(DELAY_MIN, DELAY_MAX))
 
-        # Save batch
+        # Save each batch
         batch_file = os.path.join(RAW_DIR, f"{RAW_FILE_PREFIX}_{batch_number}.csv")
         pd.DataFrame(batch_records).to_csv(batch_file, index=False)
         print(f"\nSaved batch {batch_number} with {len(batch_records)} records.")
 
     print(f"\nTotal posts fetched: {total_fetched}")
 
+
 if __name__ == "__main__":
-    fetch_subreddit_posts()
+    fetch_multi_subreddit_posts()

@@ -1,6 +1,12 @@
 scraper:
-  subreddit: "SaaS"
-  batch_size: 100 #reddit dont allow more then 1000 data per scrape request 
+  subreddits:
+    - Entrepreneur
+    - startups
+    - indiehackers
+    - microsaas
+    - growthhacking
+    - Bootstrapped
+  batch_size: 100
   max_batches: 10
   max_comments_per_post: 10
   delay_min: 1.0
