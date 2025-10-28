@@ -1,14 +1,19 @@
 scraper:
   subreddits:
     - Entrepreneur
+    - smallbusiness
+    - SaaS
+    - SoftwareAsAService
     - startups
     - indiehackers
     - microsaas
     - growthhacking
     - Bootstrapped
+  
   batch_size: 100
   max_batches: 10
   max_comments_per_post: 10
+  
   delay_min: 1.0
   delay_max: 3.0
   retry_wait: 30
@@ -16,6 +21,7 @@ scraper:
 paths:
   raw_data_dir: "data/raw/raw_batch"
   raw_data_file: "reddit_data_batch"
+  report_dir: "data/raw/raw_batch_report"  # নতুন folder for reports
 
 validation_thresholds:
   good: 70
