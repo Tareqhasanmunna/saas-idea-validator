@@ -20,8 +20,10 @@ for file in csv_files:
 # Merge all CSVs into one
 merged_df = pd.concat(dataframes, ignore_index=True)
 
+# Remove duplicates by post_id, keep first occurrence
+merged_df = merged_df.drop_duplicates(subset=['post_id'], keep='first')
 # Save merged file
 output_file = os.path.join(store_path, "merged_output.csv")
 merged_df.to_csv(output_file, index=False)
 
-print(f"Merge Successfully")
+print(f"Merge Successfully with {len(merged_df)} unique posts")
