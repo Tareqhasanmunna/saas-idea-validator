@@ -1,14 +1,12 @@
 """
 Reddit SaaS Post Scraper with Automated Per-Batch Weight Optimization
-WITH DIVERSITY FOR DYNAMIC MODEL LEARNING
-WITH SENTIMENT ANALYSIS
-WITH SMART DEDUPLICATION
+WITH PUBLIC FEEDBACK (COMMENT SENTIMENT ANALYSIS)
 
-Features:
-- Automatic duplicate detection across batches
-- Smart retry with different strategies
-- Fallback to different sources if needed
-- Maintains unique dataset
+Validation Features:
+1. Post Sentiment Analysis
+2. Comment Sentiment Analysis (avg of 10 newest comments)
+3. Post Recency
+4. Upvote Ratio
 """
 
 import praw
@@ -20,7 +18,6 @@ from dotenv import load_dotenv
 import yaml
 import sys
 from transformers import pipeline
-from datetime import datetime, timezone
 
 # Add project root for relative imports
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
@@ -121,9 +118,8 @@ def get_sentiment_score(text):
 def get_post_generator(batch_number, subreddit):
     """
     Get different post sources - SMART DEDUPLICATION VERSION
-    Rotates through multiple strategies to avoid duplicates
+    Uses keyword arguments to avoid PRAW 8 deprecation warnings
     """
-    # Use different sources to maximize diversity and minimize duplicates
     sources = [
         (subreddit.new(), "NEW_POSTS", "Most Recent Posts"),
         (subreddit.hot(), "HOT_POSTS", "Hot/Trending Posts"),
@@ -141,7 +137,7 @@ def get_post_generator(batch_number, subreddit):
 
 
 def fetch_multi_subreddit_posts():
-    """Main scraping function with smart deduplication."""
+    """Main scraping function with comment sentiment analysis."""
     total_fetched = 0
     total_skipped = 0
     total_duplicates = 0
@@ -167,7 +163,7 @@ def fetch_multi_subreddit_posts():
         print(f"📝 Description: {source_description}")
         print(f"{'='*70}")
         
-        # Step 1: Collect batch data with deduplication
+        # Step 1: Collect batch data with deduplication and comment sentiment
         sentiment_analyzed = 0
         retry_count = 0
         max_retries = 3
@@ -178,7 +174,6 @@ def fetch_multi_subreddit_posts():
             except StopIteration:
                 print(f"\n⚠️  No more posts available from {source_code}.")
                 
-                # If we couldn't fill the batch, retry with different source
                 if len(batch_records) < BATCH_SIZE and retry_count < max_retries:
                     retry_count += 1
                     print(f"\n🔄 Retrying with fallback source (Attempt {retry_count}/{max_retries})...")
@@ -199,10 +194,9 @@ def fetch_multi_subreddit_posts():
                 total_skipped += 1
                 continue
             
-            # ✅ CHECK FOR DUPLICATES
+            # CHECK FOR DUPLICATES
             if submission.id in COLLECTED_POST_IDS:
                 total_duplicates += 1
-                print(f"  ⚠️  Duplicate found: {submission.id}, skipping...", end="\r")
                 continue
             
             # Extract post details
@@ -214,23 +208,29 @@ def fetch_multi_subreddit_posts():
             upvote_ratio = getattr(submission, "upvote_ratio", 0.5)
             post_rec = recency_weight(submission.created_utc)
             
-            # Get sentiment score
+            # Get POST sentiment score
             post_sentiment = get_sentiment_score(full_text)
             sentiment_analyzed += 1
             
-            # Fetch comments
-            comment_rec_weights = []
+            # Fetch comments and calculate COMMENT SENTIMENT (NEW FEATURE!)
+            comment_sentiments = []
             if num_comments > 0:
                 try:
                     submission.comments.replace_more(limit=0)
                     comments_sorted = sorted(submission.comments.list(), 
                                            key=lambda x: x.created_utc, reverse=True)
+                    
+                    # Get sentiment for up to MAX_COMMENTS newest comments
                     for comment in comments_sorted[:MAX_COMMENTS]:
-                        comment_rec_weights.append(recency_weight(comment.created_utc))
+                        comment_text = comment.body if hasattr(comment, 'body') else ""
+                        if comment_text and len(comment_text.strip()) > 5:
+                            comment_sent = get_sentiment_score(comment_text)
+                            comment_sentiments.append(comment_sent)
                 except Exception as e:
                     pass
             
-            avg_comment_rec = sum(comment_rec_weights) / len(comment_rec_weights) if comment_rec_weights else 0
+            # Calculate average comment sentiment (public feedback)
+            avg_comment_sentiment = sum(comment_sentiments) / len(comment_sentiments) if comment_sentiments else 0.5
             
             # Add to records
             batch_records.append({
@@ -244,8 +244,8 @@ def fetch_multi_subreddit_posts():
                 "upvotes": upvotes,
                 "upvote_ratio": upvote_ratio,
                 "post_age_days": post_age,
-                "avg_comment_recency": round(avg_comment_rec, 2),
                 "post_sentiment": round(post_sentiment, 4),
+                "avg_comment_sentiment": round(avg_comment_sentiment, 4),  # NEW!
                 "post_recency": round(post_rec, 4),
                 "source_url": f"https://reddit.com{submission.permalink}",
                 "source_type": source_code
@@ -262,12 +262,11 @@ def fetch_multi_subreddit_posts():
         
         print(f"\n✓ Batch {batch_number} collection complete: {len(batch_records)} posts\n")
         
-        # Skip validation/labeling if batch is empty
         if len(batch_records) == 0:
             print(f"⚠️  Batch {batch_number} is empty, skipping...")
             continue
         
-        # Step 2: Send to validation for weight optimization
+        # Step 2: Weight optimization
         print(f"{'─'*70}")
         print(f"VALIDATION: Finding best weights for Batch {batch_number}")
         print(f"{'─'*70}")
@@ -277,10 +276,10 @@ def fetch_multi_subreddit_posts():
         print(f"\n✓ Weight optimization complete!")
         print(f"  📊 Best accuracy: {best_accuracy:.2f}")
         print(f"  ⚙️  Best weights:")
-        print(f"    • Sentiment:        {best_weights[0]:.2f}")
-        print(f"    • Comment recency:  {best_weights[1]:.2f}")
-        print(f"    • Upvote ratio:     {best_weights[2]:.2f}")
-        print(f"    • Post recency:     {best_weights[3]:.2f}")
+        print(f"    • Post Sentiment:           {best_weights[0]:.2f}")
+        print(f"    • Comment Sentiment (avg):  {best_weights[1]:.2f}")
+        print(f"    • Upvote Ratio:             {best_weights[2]:.2f}")
+        print(f"    • Post Recency:             {best_weights[3]:.2f}")
         
         # Step 3: Apply best weights to label batch
         print(f"\n{'─'*70}")
@@ -301,10 +300,8 @@ def fetch_multi_subreddit_posts():
         
         # Sentiment statistics
         print(f"  📊 Sentiment statistics:")
-        print(f"    • Mean: {df['post_sentiment'].mean():.3f}")
-        print(f"    • Std: {df['post_sentiment'].std():.3f}")
-        print(f"    • Min: {df['post_sentiment'].min():.3f}")
-        print(f"    • Max: {df['post_sentiment'].max():.3f}")
+        print(f"    • Post Sentiment Mean: {df['post_sentiment'].mean():.3f}")
+        print(f"    • Comment Sentiment Mean: {df['avg_comment_sentiment'].mean():.3f}")
         
         # Step 4: Save clean CSV
         print(f"\n{'─'*70}")
@@ -314,8 +311,8 @@ def fetch_multi_subreddit_posts():
         final_columns = [
             "post_id", "subreddit", "title", "text", "author", "created_utc",
             "num_comments", "upvotes", "upvote_ratio", "post_age_days",
-            "avg_comment_recency", "post_sentiment", "validation_score", "label", 
-            "source_url", "source_type"
+            "post_sentiment", "avg_comment_sentiment", "post_recency",
+            "validation_score", "label", "source_url", "source_type"
         ]
         
         batch_file = os.path.join(RAW_DIR, f"{RAW_FILE_PREFIX}_{batch_number}.csv")
@@ -324,7 +321,7 @@ def fetch_multi_subreddit_posts():
         print(f"✓ Saved CSV to: {batch_file}")
         print(f"  📁 Records: {len(df)}")
         
-        # Step 5: Save weights and accuracy to TXT file
+        # Step 5: Save report
         weights_str = format_weights_string(best_weights)
         weights_file = os.path.join(REPORT_DIR, f"{RAW_FILE_PREFIX}_{batch_number}_report.txt")
         
@@ -335,10 +332,10 @@ def fetch_multi_subreddit_posts():
             f.write(f"Description: {source_description}\n\n")
             f.write(f"Optimization Accuracy: {best_accuracy:.2f}\n\n")
             f.write("Best Weights:\n")
-            f.write(f"  - Sentiment Weight:        {best_weights[0]:.2f}\n")
-            f.write(f"  - Comment Recency Weight:  {best_weights[1]:.2f}\n")
-            f.write(f"  - Upvote Ratio Weight:     {best_weights[2]:.2f}\n")
-            f.write(f"  - Post Recency Weight:     {best_weights[3]:.2f}\n\n")
+            f.write(f"  - Post Sentiment Weight:           {best_weights[0]:.2f}\n")
+            f.write(f"  - Comment Sentiment Weight (avg):  {best_weights[1]:.2f}\n")
+            f.write(f"  - Upvote Ratio Weight:             {best_weights[2]:.2f}\n")
+            f.write(f"  - Post Recency Weight:             {best_weights[3]:.2f}\n\n")
             f.write(f"Weights String: {weights_str}\n\n")
             f.write("Label Distribution:\n")
             for label in ['good', 'neutral', 'bad']:
@@ -346,10 +343,8 @@ def fetch_multi_subreddit_posts():
                 percentage = (count / len(df)) * 100 if len(df) > 0 else 0
                 f.write(f"  - {label.capitalize()}: {count} ({percentage:.1f}%)\n")
             f.write("\nSentiment Statistics:\n")
-            f.write(f"  - Mean: {df['post_sentiment'].mean():.3f}\n")
-            f.write(f"  - Std: {df['post_sentiment'].std():.3f}\n")
-            f.write(f"  - Min: {df['post_sentiment'].min():.3f}\n")
-            f.write(f"  - Max: {df['post_sentiment'].max():.3f}\n")
+            f.write(f"  - Post Sentiment Mean: {df['post_sentiment'].mean():.3f}\n")
+            f.write(f"  - Comment Sentiment Mean: {df['avg_comment_sentiment'].mean():.3f}\n")
             f.write("\n" + "="*50 + "\n")
             f.write(f"Total Records: {len(df)}\n")
             f.write(f"CSV File: {batch_file}\n")
@@ -381,7 +376,8 @@ def fetch_multi_subreddit_posts():
     print(f"  ✓ Total unique posts: {len(COLLECTED_POST_IDS)}")
     print(f"  ✓ Age range: 0-180 days")
     print(f"  ✓ Diversity: Maximum (7 different sources rotated)")
-    print(f"  ✓ Sentiment Analysis: ENABLED ✅")
+    print(f"  ✓ Post Sentiment Analysis: ENABLED ✅")
+    print(f"  ✓ Comment Sentiment Analysis: ENABLED ✅")
     print(f"  ✓ Deduplication: ENABLED ✅")
     print(f"  ✓ Model learning: Dynamic & Adaptive ✅")
     
@@ -392,8 +388,7 @@ if __name__ == "__main__":
     print(f"\n{'='*70}")
     print(f"🚀 REDDIT SAAS POST SCRAPER")
     print(f"WITH AUTOMATED PER-BATCH WEIGHT OPTIMIZATION")
-    print(f"WITH DIVERSITY FOR DYNAMIC MODEL LEARNING")
-    print(f"WITH SENTIMENT ANALYSIS")
+    print(f"WITH POST & COMMENT SENTIMENT ANALYSIS")
     print(f"WITH SMART DEDUPLICATION ✨")
     print(f"{'='*70}")
     print(f"\n📋 CONFIGURATION:")
@@ -401,21 +396,22 @@ if __name__ == "__main__":
     print(f"  Batch size: {BATCH_SIZE}")
     print(f"  Total batches: {MAX_BATCHES}")
     print(f"  Max post age: {MAX_POST_AGE_DAYS} days (~6 months)")
+    print(f"  Max comments per post: {MAX_COMMENTS}")
     
-    print(f"\n🌍 DIVERSITY STRATEGY:")
-    print(f"  ✓ Rotates through 7 different post sources")
-    print(f"  ✓ Automatic duplicate detection")
-    print(f"  ✓ Fallback retry mechanism")
-    print(f"  ✓ Ensures unique dataset")
+    print(f"\n🎯 VALIDATION FEATURES:")
+    print(f"  1. Post Sentiment Analysis")
+    print(f"  2. Comment Sentiment Analysis (avg of 10 newest comments)")
+    print(f"  3. Post Recency")
+    print(f"  4. Upvote Ratio")
     
     print(f"\n💡 FEATURES:")
     print(f"  ✓ Multi-source data collection")
-    print(f"  ✓ Real sentiment analysis")
+    print(f"  ✓ Real sentiment analysis for posts")
+    print(f"  ✓ Real sentiment analysis for comments (public feedback)")
     print(f"  ✓ Smart deduplication across batches")
     print(f"  ✓ Automatic retry on duplicates")
     print(f"  ✓ Better feature variance")
     print(f"  ✓ Dynamic model learning")
-    print(f"  ✓ Improved generalization")
     
     print(f"{'='*70}\n")
     

@@ -10,7 +10,8 @@ def format_timestamp(utc):
         return ""
     return datetime.fromtimestamp(utc, timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
 
-# Recency weight (FIXED)
+
+# Recency weight (uses fractional days for precision)
 def recency_weight(created_utc, decay_days=30):
     """
     Returns a weight for a post or comment based on its age.
@@ -26,11 +27,12 @@ def recency_weight(created_utc, decay_days=30):
     
     return math.exp(-days_old / decay_days)
 
-# Comment/Post age (Keep as integer days for display)
+
+# Comment/Post age
 def age_in_days(created_utc):
     """
     Returns age in days (integer) from UTC timestamp.
-    For display purposes only.
+    For display purposes.
     """
     if not created_utc:
         return None
