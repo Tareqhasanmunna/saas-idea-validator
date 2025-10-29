@@ -1,8 +1,6 @@
-# Configuration file for Reddit SaaS Scraper with Automated Validation
-# UPDATED FOR COMMENT SENTIMENT ANALYSIS
+# Configuration - REAL DATA ONLY, NO ARTIFICIAL NOISE
 
 scraper:
-  # List of subreddits to scrape
   subreddits:
     - Entrepreneur
     - startups
@@ -11,51 +9,37 @@ scraper:
     - growthhacking
     - Bootstrapped
     - SaaS
-  
-  # Number of posts per batch
+
   batch_size: 100
-  
-  # Total number of batches (total posts = batch_size * max_batches)
   max_batches: 10
+  max_comments_per_post: 15
   
-  # Maximum comments to fetch per post (for sentiment analysis)
-  max_comments_per_post: 10
+  # CRITICAL: Skip posts with fewer than this many comments
+  min_comments_required: 3
   
-  # Delay between API requests (in seconds)
   delay_min: 1.0
   delay_max: 3.0
-  
-  # Wait time when rate limited (in seconds)
   retry_wait: 30
 
-# File paths
 paths:
-  # Directory for raw batch data
   raw_data_dir: "data/raw/raw_batch"
-  
-  # Prefix for batch files (will be appended with batch number)
   raw_data_file: "reddit_data_batch"
-  
-  # Directory for batch reports
   report_dir: "data/raw/raw_batch_report"
 
-# Validation thresholds for labeling
 validation_thresholds:
-  # Score >= good -> "good" label
   good: 70
-  
-  # neutral <= Score < good -> "neutral" label
-  # Score < neutral -> "bad" label
   neutral: 40
 
-# Weight validator settings
 weight_validator:
-  # Step size for weight generation (0.1 = 286 combinations)
   step_size: 0.1
+  min_weight: 0.01
 
-# Validation features (4 features for weight optimization)
+nan_handling:
+  method: 'median'  # Simple median, no noise needed
+  min_value: 0.01
+
 validation_features:
-  - post_sentiment          # Sentiment analysis of post content
-  - avg_comment_sentiment   # Average sentiment of 10 newest comments (PUBLIC FEEDBACK)
-  - upvote_ratio            # Reddit upvote ratio
-  - post_recency            # How recent is the post
+  - post_sentiment
+  - avg_comment_sentiment
+  - upvote_ratio
+  - post_recency

@@ -1,13 +1,14 @@
 """
-Automated Weight Validation System for Reddit SaaS Post Validation
-
-UPDATED FOR COMMENT SENTIMENT ANALYSIS
+Automated Weight Validation System
+NO ZERO WEIGHTS - All parameters used
 
 Weight Components:
-    1. post_sentiment: Sentiment score of the post
-    2. avg_comment_sentiment: Average sentiment of newest 10 comments (PUBLIC FEEDBACK)
-    3. upvote_ratio: Reddit upvote ratio
-    4. post_recency: Recency of the post itself
+    1. post_sentiment
+    2. avg_comment_sentiment
+    3. upvote_ratio
+    4. post_recency
+
+Enforces minimum weight of 0.01 to ensure all parameters contribute.
 """
 
 import pandas as pd
@@ -16,24 +17,18 @@ import numpy as np
 
 class AutomatedWeightValidator:
     """
-    Automated validation system that tests different weight combinations
-    to find the optimal weights for each batch of scraped data.
+    Automated validation system with NO ZERO WEIGHTS guarantee.
+    All parameters must contribute with minimum weight of 0.01.
     
     Weight components: [post_sentiment, avg_comment_sentiment, upvote_ratio, post_recency]
     """
     
-    def __init__(self, step_size=0.1, good_threshold=70, neutral_threshold=40):
-        """
-        Initialize the validator.
-        
-        Args:
-            step_size: Granularity for weight generation (e.g., 0.1 means 0.0, 0.1, 0.2, ...)
-            good_threshold: Score threshold for 'good' label
-            neutral_threshold: Score threshold for 'neutral' label (below this is 'bad')
-        """
+    def __init__(self, step_size=0.1, good_threshold=70, neutral_threshold=40, min_weight=0.01):
+        """Initialize the validator"""
         self.step_size = step_size
         self.good_threshold = good_threshold
         self.neutral_threshold = neutral_threshold
+        self.min_weight = min_weight  # Minimum weight to ensure no parameter is unused
         self.weight_combinations = self._generate_weight_combinations()
         
     def _generate_weight_combinations(self):
@@ -50,29 +45,54 @@ class AutomatedWeightValidator:
         
         return weights
     
-    def calculate_validation_score(self, record, weights):
+    def enforce_minimum_weights(self, weights):
         """
-        Calculate validation score for a single record using given weights.
+        Ensure no weight is zero. Apply minimum weight and re-normalize.
         
         Args:
-            record: Dictionary containing:
-                   - post_sentiment
-                   - avg_comment_sentiment (NEW! replaces comment recency)
-                   - upvote_ratio
-                   - post_recency
-            weights: List of 4 weights [w_post_sent, w_comment_sent, w_upvote, w_post_rec]
+            weights: List of 4 weights
+        
+        Returns:
+            Adjusted weights that sum to 1.0 with minimum weight enforced
+        """
+        # Apply minimum weight
+        adjusted = [max(w, self.min_weight) for w in weights]
+        
+        # Re-normalize to sum to 1.0
+        total = sum(adjusted)
+        adjusted = [w / total for w in adjusted]
+        
+        # Round to avoid floating point errors
+        adjusted = [round(w, 2) for w in adjusted]
+        
+        # Ensure sum is exactly 1.0
+        diff = 1.0 - sum(adjusted)
+        if abs(diff) > 0.001:
+            adjusted[-1] += diff
+            adjusted[-1] = round(adjusted[-1], 2)
+        
+        return adjusted
+    
+    def calculate_validation_score(self, record, weights):
+        """
+        Calculate validation score for a record.
+        Assumes NaN values have been replaced with valid values.
+        
+        Args:
+            record: Dictionary with features (all valid, no NaN)
+            weights: List of 4 weights
         
         Returns:
             Validation score (0-100)
         """
         post_sentiment = record.get('post_sentiment', 0.5)
-        avg_comment_sentiment = record.get('avg_comment_sentiment', 0.5)  # NEW!
+        avg_comment_sentiment = record.get('avg_comment_sentiment', 0.5)
         upvote_ratio = record.get('upvote_ratio', 0.5)
-        post_rec = record.get('post_recency', 0)
+        post_rec = record.get('post_recency', 0.5)
         
         score = (
             weights[0] * post_sentiment +
-            weights[1] * avg_comment_sentiment +  # NEW: Comment sentiment instead of recency
+            weights[1] * avg_comment_sentiment +
             weights[2] * upvote_ratio +
             weights[3] * post_rec
         ) * 100
@@ -90,12 +110,12 @@ class AutomatedWeightValidator:
     
     def calculate_batch_accuracy(self, batch_data, weights, ground_truth_labels=None):
         """
-        Calculate accuracy for a batch using given weights.
+        Calculate accuracy for a batch
         
         Args:
             batch_data: List of dictionaries (batch records)
             weights: Weight combination to test
-            ground_truth_labels: Optional ground truth labels for supervised accuracy
+            ground_truth_labels: Optional ground truth labels
         
         Returns:
             Accuracy score (higher is better)
@@ -115,33 +135,34 @@ class AutomatedWeightValidator:
             accuracy = (correct / len(ground_truth_labels)) * 100
             return accuracy
         
-        # Otherwise, use label distribution consistency as a heuristic
+        # Otherwise, use label distribution consistency
         label_counts = pd.Series(predicted_labels).value_counts()
         total = len(predicted_labels)
         
-        # Calculate entropy-based score (higher entropy = more balanced)
+        # Calculate entropy-based score
         entropy = 0
         for count in label_counts.values:
             p = count / total
             if p > 0:
                 entropy -= p * np.log(p)
         
-        # Normalize entropy (max entropy for 3 labels is log(3))
+        # Normalize entropy
         max_entropy = np.log(3)
         normalized_entropy = (entropy / max_entropy) * 100
         
-        # Also consider average score variance (reward discriminative scoring)
+        # Consider score variance
         score_variance = np.var(scores)
         variance_score = min(score_variance / 100, 1.0) * 100
         
-        # Combined accuracy metric (70% entropy, 30% variance)
+        # Combined accuracy metric
         accuracy = 0.7 * normalized_entropy + 0.3 * variance_score
         
         return accuracy
     
     def find_best_weights(self, batch_data, ground_truth_labels=None):
         """
-        Test all weight combinations and find the one with best accuracy.
+        Test all weight combinations and find the best.
+        Enforces minimum weights to ensure all parameters are used.
         
         Args:
             batch_data: List of dictionaries (batch records)
@@ -153,6 +174,8 @@ class AutomatedWeightValidator:
         results = []
         
         print(f"Testing {len(self.weight_combinations)} weight combinations...")
+        print(f"Minimum weight enforcement: {self.min_weight:.2f}")
+        
         for i, weights in enumerate(self.weight_combinations):
             accuracy = self.calculate_batch_accuracy(batch_data, weights, ground_truth_labels)
             results.append({
@@ -160,7 +183,6 @@ class AutomatedWeightValidator:
                 'accuracy': accuracy
             })
             
-            # Progress indicator
             if (i + 1) % 50 == 0:
                 print(f"  Tested {i + 1}/{len(self.weight_combinations)} combinations...", end='\r')
         
@@ -173,11 +195,14 @@ class AutomatedWeightValidator:
         best_weights = best_result['weights']
         best_accuracy = best_result['accuracy']
         
+        # Enforce minimum weights to ensure all parameters are used
+        best_weights = self.enforce_minimum_weights(best_weights)
+        
         return best_weights, best_accuracy, results_sorted
     
     def validate_and_label_batch(self, batch_data, best_weights):
         """
-        Apply best weights to batch data and generate final labeled records.
+        Apply best weights to batch data and generate labeled records.
         
         Args:
             batch_data: List of dictionaries (batch records)
