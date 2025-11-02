@@ -1,5 +1,25 @@
-# Configuration - REAL DATA ONLY, NO ARTIFICIAL NOISE
+# ======================================================
+# SaaS Idea Validator - Full Project Configuration
+# ======================================================
 
+# Paths
+paths:
+  raw_data_dir: data/raw/raw_batch
+  raw_batch_report_dir: data/raw/raw_batch_report
+  raw_merged_dir: data/raw/raw_merged
+  processed_data_dir: data/processed
+  fold_info_dir: data/fold_info
+  results_dir: results
+  models_dir: models
+  logs_dir: logs
+  reports_dir: src/training/reports
+
+# Reddit API Configuration
+reddit:
+  load_from_env: true
+  rate_limit_delay: [1.0, 3.0]
+
+# Data Scraping Configuration
 scraper:
   subreddits:
     - Entrepreneur
@@ -9,37 +29,77 @@ scraper:
     - growthhacking
     - Bootstrapped
     - SaaS
-
   batch_size: 100
   max_batches: 10
-  max_comments_per_post: 15
-  
-  # CRITICAL: Skip posts with fewer than this many comments
-  min_comments_required: 3
-  
+  max_comments_per_post: 10
   delay_min: 1.0
   delay_max: 3.0
-  retry_wait: 30
+  min_comments_required: 3
 
-paths:
-  raw_data_dir: "data/raw/raw_batch"
-  raw_data_file: "reddit_data_batch"
-  report_dir: "data/raw/raw_batch_report"
-
+# Validation Thresholds
 validation_thresholds:
   good: 70
   neutral: 40
+  bad: 0
 
-weight_validator:
-  step_size: 0.1
-  min_weight: 0.01
+# Features Configuration
+features:
+  numerical:
+    - post_sentiment
+    - avg_comment_sentiment
+    - num_comments
+    - upvotes
+    - upvote_ratio
+  text:
+    - token_text
+  target: label_numeric
+  vector_column: vector
 
-nan_handling:
-  method: 'median'  # Simple median, no noise needed
-  min_value: 0.01
+# Text Vectorization Configuration
+vectorizer:
+  type: tfidf               # Options: tfidf, count, word2vec, bert
+  max_features: 200
+  stop_words: english
+  ngram_range: [1,2]
+  min_df: 2
+  max_df: 0.8
+  sublinear_tf: true
+  lowercase: true
 
-validation_features:
-  - post_sentiment
-  - avg_comment_sentiment
-  - upvote_ratio
-  - post_recency
+# Machine Learning Configuration
+ml:
+  use_precomputed_vectors: true
+  models:
+    - logistic_regression
+    - svm
+    - random_forest
+    - gradient_boosting
+    - xgboost
+    - lightgbm
+    - knn
+    - naive_bayes
+    - ada_boost
+  hyperparameter_tuning: true
+  cv_folds: 10
+  scoring: f1
+  class_weight: balanced
+
+
+# Preprocessing Configuration
+preprocessing:
+  scaling: true               # StandardScaler for numeric + vector features
+  oversampling: smote         # Use SMOTE to handle class imbalance
+  encoding: label_encoding    # For target label_numeric
+  shuffle: true
+
+# Logging & Reporting
+logging:
+  enable: true
+  log_dir: src/training/reports/logs
+  save_fold_reports: true
+  save_summary_reports: true
+  save_comparison_table: true
+  report_format: txt
+
+# Reproducibility
+random_state: 42

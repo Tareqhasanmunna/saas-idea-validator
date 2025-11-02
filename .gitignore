@@ -3,26 +3,41 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
-
-# Virtual environment
-venv/
-env/
+*.ipynb_checkpoints/
+.env
 .venv/
+env/
+venv/
 
-# Data files
+# Data
 data/raw/
-data/processed/
+data/interim/
+data/temp/
+*.csv
+*.tsv
+*.xlsx
 
-# Config / secrets
-*.env
-config.yaml
+# Reports / Logs
+src/training/reports/
+logs/
+*.log
+*.txt
 
-# Jupyter notebooks checkpoints
+# Jupyter Notebook Checkpoints
 .ipynb_checkpoints/
 
-# Logs
-*.log
+# IDE settings
+.vscode/
+.idea/
 
-# OS files
+# OS junk
 .DS_Store
 Thumbs.db
+
+# Virtual environment / Dependencies
+*.egg-info/
+dist/
+build/
+
+# Cache
+.cache/
