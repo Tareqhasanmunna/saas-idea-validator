@@ -20,7 +20,8 @@ imbalanced-learn==0.10.1
 torch==2.0.1  
 transformers==4.33.2  
 sentence-transformers==2.2.2  
-huggingface-hub==0.17.3  
+huggingface-hub==0.17.3
+catboost==1.2.8 
 
 # ============================================================================  
 # Reinforcement Learning (for future RL implementation)  
