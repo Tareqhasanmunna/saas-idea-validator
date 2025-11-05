@@ -2,6 +2,8 @@ from src.training.sl_training.data_loader import DataLoader
 from src.training.sl_training.train_pipeline import TrainingPipeline
 from src.training.sl_training.model_definitions import ModelFactory
 import os
+import warnings
+warnings.filterwarnings("ignore")
 
 CONFIG = {
     "data_path": "E:/saas-idea-validator/data/processed/vectorised_dataset.csv",
