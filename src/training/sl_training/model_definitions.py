@@ -15,9 +15,8 @@ class ModelFactory:
             "gradient_boosting": GradientBoostingClassifier(),
             "xgboost": xgb.XGBClassifier(use_label_encoder=False, eval_metric='mlogloss'),
             "lightgbm": lgb.LGBMClassifier(),
-            "catboost": CatBoostClassifier(verbose=0),
+            "catboost": CatBoostClassifier(verbose=0, allow_writing_files=True, train_dir="E:/saas-idea-validator/reports/catboost_logs"),
             "logistic_regression": LogisticRegression(max_iter=500),
-            "multinomial_nb": MultinomialNB(),
             "bernoulli_nb": BernoulliNB()
         }
 
@@ -29,7 +28,6 @@ class ModelFactory:
             "lightgbm": {"n_estimators":[100,200], "max_depth":[-1,5,10], "learning_rate":[0.05,0.1]},
             "catboost": {"iterations":[200,300], "depth":[4,6,8], "learning_rate":[0.05,0.1]},
             "logistic_regression": {"C":[0.01,0.1,1,10], "solver":["liblinear","lbfgs"]},
-            "multinomial_nb": {"alpha":[0.1,0.5,1]},
             "bernoulli_nb": {"alpha":[0.1,0.5,1]}
         }
 
