@@ -1,18 +1,22 @@
 # ======================================================
-# SaaS Idea Validator - Full Project Configuration
+# SaaS Idea Validator - Full Project Configuration (RL-ready)
 # ======================================================
 
 # Paths
 paths:
-  raw_data_dir: data/raw/raw_batch
+  raw_data_dir: data/raw/raw_batch                   # incoming batch CSVs
   raw_batch_report_dir: data/raw/raw_batch_report
-  raw_merged_dir: data/raw/raw_merged
-  processed_data_dir: data/processed
+  raw_merged_dir: data/raw/raw_merged                # merged outputs
+  processed_data_dir: data/processed                 # preprocessed outputs
   fold_info_dir: data/fold_info
   results_dir: results
-  models_dir: models
+  models_dir: models                                 # saved model files (.joblib / .pkl)
+  models_archive_dir: models/archive
   logs_dir: logs
   reports_dir: src/training/reports
+  w2v_model_dir: src/preprocessing/w2v_model         # location to save w2v.model
+  rl_logs_dir: src/rl/logs
+  data_archive_dir: data/archive
 
 # Reddit API Configuration
 reddit:
@@ -35,6 +39,7 @@ scraper:
   delay_min: 1.0
   delay_max: 3.0
   min_comments_required: 3
+  max_post_age_days: 183
 
 # Validation Thresholds
 validation_thresholds:
@@ -66,31 +71,59 @@ vectorizer:
   sublinear_tf: true
   lowercase: true
 
-# Machine Learning Configuration
+# Machine Learning Configuration (lean set for mixed text+numeric)
 ml:
   use_precomputed_vectors: true
   models:
-    - logistic_regression
-    - svm
+    - decision_tree
     - random_forest
     - gradient_boosting
     - xgboost
     - lightgbm
-    - knn
-    - naive_bayes
-    - ada_boost
+    - catboost
+    - logistic_regression
+    - bernoulli_nb
   hyperparameter_tuning: true
   cv_folds: 10
-  scoring: f1
+  scoring: f1_weighted
   class_weight: balanced
-
 
 # Preprocessing Configuration
 preprocessing:
   scaling: true               # StandardScaler for numeric + vector features
-  oversampling: smote         # Use SMOTE to handle class imbalance
+  oversampling: smote         # Use SMOTE to handle class imbalance (optional)
   encoding: label_encoding    # For target label_numeric
   shuffle: true
+  save_w2v: true              # save word2vec model after preprocessing
+  w2v_model_dir: src/preprocessing/w2v_model
+
+# Merge behavior (raw batch merging)
+merge:
+  merge_on_scrape_complete: true   # RL controller will call merge automatically
+  merge_pattern: "merged_{timestamp}.csv"
+  auto_delete_batches_after_merge: true
+  batch_filename_prefix: reddit_batch
+
+# RL / Automation settings
+rl:
+  enabled: true
+  mode: test                     # "test" or "prod"
+  delay_seconds_test: 60         # cycle delay when mode=test (seconds)
+  delay_seconds_prod: 2592000    # 30 days in seconds when mode=prod
+  run_on_startup: true           # run immediately when controller starts
+  perform_cleanup_before_cycle: true
+
+# Retention (recency & storage hygiene)
+retention:
+  data_retention_months: 3     # delete processed/merged/raw older than this
+  model_retention_months: 2    # delete old models older than this
+  archive_old_batches: true    # move old raw batches to archive before final deletion
+
+# NaN handling (kept from previous config)
+nan_handling:
+  method: mean_plus_noise
+  noise_std: 0.03
+  min_value: 0.01
 
 # Logging & Reporting
 logging:
@@ -100,6 +133,7 @@ logging:
   save_summary_reports: true
   save_comparison_table: true
   report_format: txt
+  rl_log_file: src/rl/logs/rl_controller.log
 
 # Reproducibility
 random_state: 42

@@ -37,7 +37,7 @@ def main():
     # Print all saved model paths
     print("\n[SAVED MODELS]")
     for model_name in models_dict.keys():
-        model_file = os.path.join(CONFIG["model_save_dir"], f"{model_name}_model.joblib")
+        model_file = os.path.join(CONFIG["model_save_dir"], f"{model_name}.joblib")
         if os.path.exists(model_file):
             print(f"{model_name}: {model_file}")
         else:

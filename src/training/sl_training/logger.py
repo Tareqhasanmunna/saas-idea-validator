@@ -23,7 +23,8 @@ class Logger:
         os.makedirs(log_dir, exist_ok=True)
         file_path = os.path.join(log_dir, f"{model_name}_summary.txt")
         with open(file_path, "w") as f:
-            f.write(f"Model: {model_name} | 10-Fold CV Summary\n")
+            f.write("model_name: {}\n".format(model_name))  # explicitly add model_name label
+            f.write(f"{model_name} | 10-Fold CV Summary\n")
             f.write("="*80 + "\n")
             for metric, value in avg_metrics.items():
                 f.write(f"{metric}: {value:.4f}\n")
