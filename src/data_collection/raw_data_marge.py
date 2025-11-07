@@ -3,8 +3,8 @@ import glob
 import os
 
 # Folder where your CSV files are located
-folder_path = 'E:\saas-idea-validator\data\raw\raw_batch'
-store_path =  'E:\saas-idea-validator\data\raw\raw_marged' # 🔹 Change this to your folder path
+folder_path = r'E:\saas-idea-validator\data\raw\raw_batch'
+store_path = r'E:\saas-idea-validator\data\raw\raw_marged'  #  Change this to your folder path
 
 # Get all CSV files in the folder
 csv_files = glob.glob(os.path.join(folder_path, "*.csv"))
@@ -20,8 +20,10 @@ for file in csv_files:
 # Merge all CSVs into one
 merged_df = pd.concat(dataframes, ignore_index=True)
 
+# Remove duplicates by post_id, keep first occurrence
+merged_df = merged_df.drop_duplicates(subset=['post_id'], keep='first')
 # Save merged file
-output_file = os.path.join(folder_path, "merged_output.csv")
+output_file = os.path.join(store_path, "merged_output.csv")
 merged_df.to_csv(output_file, index=False)
 
-print(f"✅ All CSV files merged successfully!\nSaved as: {output_file}")
+print(f"Merge Successfully with {len(merged_df)} unique posts")
