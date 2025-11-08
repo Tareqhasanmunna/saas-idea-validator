@@ -5,7 +5,7 @@ import shutil
 # Configurations
 report_csv = r'E:\saas-idea-validator\reports\model_comparison.csv'  # Update to your path
 models_folder = r'E:\saas-idea-validator\models'                    # Folder containing your .joblib model files
-best_model_dest = r'E:\saas-idea-validator\best_model'              # Folder to copy the best model to
+best_model_dest = r'E:\saas-idea-validator\best_sl_model'              # Folder to copy the best model to
 
 # Read the model performance report
 df = pd.read_csv(report_csv)
