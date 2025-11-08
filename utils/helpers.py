@@ -1,173 +1,116 @@
-from datetime import datetime, timezone
-import math
-import pandas as pd
-import numpy as np
+import os
+import yaml
+import logging
+from datetime import datetime
+from pathlib import Path
 
+def setup_rl_logger(log_file, logger_name="RLSystem"):
+    logger = logging.getLogger(logger_name)
+    logger.setLevel(logging.INFO)
+    os.makedirs(os.path.dirname(log_file), exist_ok=True)
+    handler = logging.FileHandler(log_file)
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+    return logger
 
-# Timestamp formatting
-def format_timestamp(utc):
-    """UTC timestamp to ISO string"""
-    if not utc:
-        return ""
-    return datetime.fromtimestamp(utc, timezone.utc).strftime('%Y-%m-%dT%H:%M:%SZ')
+def cleanup_old_files(directory, retention_days, file_pattern="*", exclude_dirs=None, logger=None):
+    if not os.path.exists(directory):
+        return {"deleted_count": 0, "kept_count": 0}
+    
+    deleted = 0
+    kept = 0
+    cutoff_time = datetime.now().timestamp() - (retention_days * 86400)
+    
+    for file in Path(directory).glob(file_pattern):
+        if file.is_file():
+            if file.stat().st_mtime < cutoff_time:
+                try:
+                    file.unlink()
+                    deleted += 1
+                    if logger:
+                        logger.info(f"Deleted: {file}")
+                except:
+                    pass
+            else:
+                kept += 1
+    
+    return {"deleted_count": deleted, "kept_count": kept}
 
+def cleanup_directory_by_count(directory, keep_count, file_pattern="*", logger=None):
+    if not os.path.exists(directory):
+        return {"deleted_count": 0, "kept_count": 0}
+    
+    files = sorted(Path(directory).glob(file_pattern), key=lambda x: x.stat().st_mtime, reverse=True)
+    deleted = 0
+    
+    for file in files[keep_count:]:
+        if file.is_file():
+            try:
+                file.unlink()
+                deleted += 1
+                if logger:
+                    logger.info(f"Deleted old model: {file.name}")
+            except:
+                pass
+    
+    return {"deleted_count": deleted, "kept_count": min(len(files), keep_count)}
 
-# Recency weight
-def recency_weight(created_utc, decay_days=30):
-    """
-    Returns a weight for a post based on its age.
-    Newer items have higher weight, decaying exponentially.
-    Uses fractional days for precise recency calculation.
-    """
-    if not created_utc:
+def archive_files(source_dir, archive_dir, file_pattern, logger=None):
+    import shutil
+    if not os.path.exists(source_dir):
         return 0
     
-    time_diff = datetime.now(timezone.utc) - datetime.fromtimestamp(created_utc, timezone.utc)
-    days_old = time_diff.total_seconds() / 86400  # Fractional days
+    os.makedirs(archive_dir, exist_ok=True)
+    archived = 0
     
-    return math.exp(-days_old / decay_days)
+    for file in Path(source_dir).glob(file_pattern):
+        if file.is_file() and (datetime.now().timestamp() - file.stat().st_mtime) > 2592000:
+            try:
+                shutil.move(str(file), os.path.join(archive_dir, file.name))
+                archived += 1
+                if logger:
+                    logger.info(f"Archived: {file.name}")
+            except:
+                pass
+    
+    return archived
 
-
-# Post age in days
-def age_in_days(created_utc):
-    """
-    Returns age in days (integer) from UTC timestamp.
-    """
-    if not created_utc:
+def get_best_model_path(model_dir, extension=".joblib"):
+    if not os.path.exists(model_dir):
         return None
-    return (datetime.now(timezone.utc) - datetime.fromtimestamp(created_utc, timezone.utc)).days
+    
+    files = list(Path(model_dir).glob(f"*{extension}"))
+    if not files:
+        return None
+    
+    return str(max(files, key=lambda x: x.stat().st_mtime))
 
+def get_directory_size_mb(directory):
+    if not os.path.exists(directory):
+        return 0
+    
+    total = sum(f.stat().st_size for f in Path(directory).rglob("*") if f.is_file())
+    return total / (1024 * 1024)
 
-# NaN handling functions
+def create_backup(source_path, backup_dir, logger=None):
+    import shutil
+    if not os.path.exists(source_path):
+        return None
+    
+    os.makedirs(backup_dir, exist_ok=True)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    backup_path = os.path.join(backup_dir, f"{Path(source_path).stem}_{timestamp}{Path(source_path).suffix}")
+    
+    try:
+        shutil.copy2(source_path, backup_path)
+        if logger:
+            logger.info(f"Backup created: {backup_path}")
+        return backup_path
+    except Exception as e:
+        if logger:
+            logger.error(f"Backup failed: {str(e)}")
+        return None
 
-def replace_nan_with_mean_plus_noise(df, column, noise_std=0.03, min_value=0.01):
-    """
-    Replace NaN values with mean + random noise, ensuring minimum value.
-    
-    This approach:
-    - Preserves variance by adding small random noise
-    - Prevents identical values that collapse variance
-    - Ensures no value falls below min_value (0.01 default)
-    
-    Args:
-        df: pandas DataFrame
-        column: column name to replace NaN values
-        noise_std: standard deviation of random noise (default: 0.03)
-        min_value: minimum value to ensure (default: 0.01)
-    
-    Returns:
-        DataFrame with NaN replaced by mean + noise
-    """
-    if column in df.columns:
-        mean_value = df[column].mean()
-        if not pd.isna(mean_value):
-            nan_mask = df[column].isna()
-            nan_count = nan_mask.sum()
-            
-            if nan_count > 0:
-                # Generate noise
-                noise = np.random.normal(0, noise_std, nan_count)
-                # Calculate replacement values
-                replacement = mean_value + noise
-                # Ensure minimum value
-                replacement = np.maximum(replacement, min_value)
-                # Replace NaN values
-                df.loc[nan_mask, column] = replacement
-    
-    return df
-
-
-def replace_nan_with_mean(df, column, min_value=0.01):
-    """
-    Replace NaN values with mean, ensuring minimum value.
-    
-    Args:
-        df: pandas DataFrame
-        column: column name to replace NaN values
-        min_value: minimum value to ensure (default: 0.01)
-    
-    Returns:
-        DataFrame with NaN replaced by mean
-    """
-    if column in df.columns:
-        mean_value = df[column].mean()
-        if not pd.isna(mean_value):
-            mean_value = max(mean_value, min_value)
-            df[column].fillna(mean_value, inplace=True)
-    return df
-
-
-def replace_nan_with_median(df, column, min_value=0.01):
-    """
-    Replace NaN values with median, ensuring minimum value.
-    
-    Args:
-        df: pandas DataFrame
-        column: column name to replace NaN values
-        min_value: minimum value to ensure (default: 0.01)
-    
-    Returns:
-        DataFrame with NaN replaced by median
-    """
-    if column in df.columns:
-        median_value = df[column].median()
-        if not pd.isna(median_value):
-            median_value = max(median_value, min_value)
-            df[column].fillna(median_value, inplace=True)
-    return df
-
-
-def handle_nan_values(df, method='mean_plus_noise', noise_std=0.03, min_value=0.01):
-    """
-    Handle NaN values in all feature columns.
-    Ensures no value falls below min_value to prevent zero weights.
-    
-    Args:
-        df: pandas DataFrame with features
-        method: 'mean', 'median', or 'mean_plus_noise' (default: 'mean_plus_noise')
-        noise_std: standard deviation for noise if method='mean_plus_noise'
-        min_value: minimum value to ensure (default: 0.01)
-    
-    Returns:
-        DataFrame with NaN values replaced
-    """
-    feature_columns = ['post_sentiment', 'avg_comment_sentiment', 'upvote_ratio', 'post_recency']
-    
-    for col in feature_columns:
-        if col in df.columns:
-            if method == 'mean':
-                df = replace_nan_with_mean(df, col, min_value)
-            elif method == 'median':
-                df = replace_nan_with_median(df, col, min_value)
-            elif method == 'mean_plus_noise':
-                df = replace_nan_with_mean_plus_noise(df, col, noise_std, min_value)
-    
-    return df
-
-
-def get_nan_statistics(df, feature_columns=['post_sentiment', 'avg_comment_sentiment', 'upvote_ratio', 'post_recency']):
-    """
-    Get NaN statistics for feature columns.
-    
-    Args:
-        df: pandas DataFrame
-        feature_columns: list of feature column names
-    
-    Returns:
-        Dictionary with NaN counts and percentages
-    """
-    stats = {}
-    total_records = len(df)
-    
-    for col in feature_columns:
-        if col in df.columns:
-            nan_count = df[col].isna().sum()
-            nan_percentage = (nan_count / total_records) * 100
-            stats[col] = {
-                'nan_count': nan_count,
-                'nan_percentage': nan_percentage,
-                'valid_count': total_records - nan_count
-            }
-    
-    return stats
-
+def get_dataframe_memory_usage_mb(df):
+    return df.memory_usage(deep=True).sum() / (1024 * 1024)

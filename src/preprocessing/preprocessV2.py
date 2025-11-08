@@ -1,8 +1,3 @@
-"""Converted from preprocessV2.ipynb to preprocessV2.py"""
-
-# NOTE: Markdown cells are converted to comment blocks. Code cells are preserved.
-
-# ---- Code cell 1 ----
 import os
 import pandas as pd
 import numpy as np
@@ -10,182 +5,207 @@ import re
 import string
 import emoji
 import nltk
+import logging
+from datetime import datetime
+import joblib
+import yaml
 
-# Download necessary NLTK resources (first time only)
-nltk.download('stopwords')
-nltk.download('punkt')
+try:
+    nltk.data.find('tokenizers/punkt')
+except LookupError:
+    nltk.download('punkt')
+
+try:
+    nltk.data.find('corpora/stopwords')
+except LookupError:
+    nltk.download('stopwords')
 
 from nltk.corpus import stopwords
 from nltk.tokenize import word_tokenize
-
-
-# Prepare stopwords
-stop_words = set(stopwords.words('english'))
-
-print("Libraries imported successfully.")
-
-
-
-# ---- Code cell 2 ----
-# Replace with your dataset path
-df = pd.read_csv(r'E:saas-idea-validator\data\raw\raw_marged\merged_output.csv')
-
-# Show first 10 rows
-df.head(10)
-
-
-# ---- Code cell 3 ----
-columns_to_keep = [
-    'title', 'text', 'post_sentiment', 'avg_comment_sentiment',
-    'num_comments', 'upvotes', 'upvote_ratio', 'label'
-]
-
-# Keep only existing ones (some may be missing)
-df = df[[c for c in columns_to_keep if c in df.columns]].copy()
-
-print("Columns kept:", df.columns.tolist())
-
-
-
-df.head(10)
-
-
-# ---- Code cell 4 ----
-print("Missing values per column:\n", df.isnull().sum())
-
-# Drop rows with no label (since supervised learning needs labels)
-if 'label' in df.columns:
-    df = df.dropna(subset=['label'])
-
-# Fill numeric NaNs with 0
-num_cols = ['post_sentiment', 'avg_comment_sentiment', 'num_comments', 'upvotes', 'upvote_ratio']
-for col in num_cols:
-    if col in df.columns:
-        df[col] = df[col].fillna(0)
-
-# Fill text NaNs with empty strings
-for col in ['title', 'text']:
-    if col in df.columns:
-        df[col] = df[col].fillna('')
-
-print("After handling missing values, shape:", df.shape)
-df.head(5)
-
-
-# ---- Code cell 5 ----
-df['text_no_url'] = df['text'].apply(lambda x: re.sub(r'http\S+|www\S+', '', str(x)))
-
-df[['text', 'text_no_url']].head(10)
-
-
-
-# ---- Code cell 6 ----
-df['text_no_emoji'] = df['text_no_url'].apply(lambda x: emoji.replace_emoji(x, replace=''))
-
-df[['text_no_url', 'text_no_emoji']].head(10)
-
-
-# ---- Code cell 7 ----
-df['text_no_punct'] = df['text_no_emoji'].apply(lambda x: x.translate(str.maketrans('', '', string.punctuation)))
-
-df[['text_no_emoji', 'text_no_punct']].head(10)
-
-
-# ---- Code cell 8 ----
-df['text_no_num'] = df['text_no_punct'].apply(lambda x: re.sub(r'\d+', '', x))
-
-df[['text_no_punct', 'text_no_num']].head(10)
-
-
-# ---- Code cell 9 ----
-df['text_no_special'] = df['text_no_num'].apply(lambda x: re.sub(r'[^A-Za-z\s]', '', x))
-
-df[['text_no_num', 'text_no_special']].head(10)
-
-
-# ---- Code cell 10 ----
-df['text_cleaned'] = df['text_no_special'].apply(lambda x: re.sub(r'\s+', ' ', x.lower()).strip())
-
-df[['text_no_special', 'text_cleaned']].head(10)
-
-
-# ---- Code cell 11 ----
-df['text_final'] = df['text_cleaned'].apply(lambda x: ' '.join(word for word in x.split() if word not in stop_words))
-
-df[['text_cleaned', 'text_final']].head(10)
-
-
-# ---- Code cell 12 ----
-df.head(10)
-
-
-# ---- Code cell 13 ----
-def remove_stopwords(text_final):
-    return ' '.join(word for word in text_final.split() if word not in stop_words)
-df.head(10)
-
-
-# ---- Code cell 14 ----
-df.drop(['title', 'text', 'text_no_url','text_no_emoji','text_no_punct','text_no_num','text_no_special','text_cleaned','num_comments'], axis=1, inplace=True)
-df.head(10)
-
-
-# ---- Code cell 15 ----
-# Save the dataframe to a new CSV file
-df.to_csv('E:\\saas-idea-validator\\data\\processed\\cleaned_dataset.csv', index=False)
-
-print("Cleaned dataset saved as 'E:\\saas-idea-validator\\data\\processed\\cleaned_dataset.csv'")
-
-
-# ---- Code cell 16 ----
-import pandas as pd
-import nltk
-from nltk import word_tokenize
-nltk.download('punkt')
-df = pd.read_csv('E:\saas-idea-validator\data\processed\cleaned_dataset.csv')
-df['token_text'] = df['text_final'].apply(lambda x: word_tokenize(str(x)))
-print("Tokenized dataset saved as 'tokenized_dataset.csv'")
-print(df.head())
-
-
-# ---- Code cell 17 ----
-df.drop(columns=['text_final'], inplace=True)
-df.head(10)
-
-
-# ---- Code cell 18 ----
-# Save the dataframe to a new CSV file
-df.to_csv('E:\\saas-idea-validator\\data\\processed\\tokenized_dataset.csv', index=False)
-
-print("Tokenized dataset saved as 'E:\\saas-idea-validator\\data\\processed\\tokenized_dataset.csv'")
-
-
-# ---- Code cell 19 ----
-import pandas as pd
-import numpy as np
-from gensim.models import Word2Vec
-df = pd.read_csv(r'E:\saas-idea-validator\data\processed\tokenized_dataset.csv')
-w2v_model = Word2Vec(sentences=df['token_text'], vector_size=100, window=5, min_count=1, workers=4)
-
-# --- Step 5: Sentence vector (average of word vectors) ---
-def get_sentence_vector(tokens):
-    vectors = [w2v_model.wv[word] for word in tokens if word in w2v_model.wv]
-    if len(vectors) == 0:
-        return np.zeros(w2v_model.vector_size)
-    return np.mean(vectors, axis=0)
-
-df['vector'] = df['token_text'].apply(get_sentence_vector)
-df.head(10)
-
-
-# ---- Code cell 20 ----
-# Save the dataframe to a new CSV file
-df.to_csv('E:\\saas-idea-validator\\data\\processed\\vectorised_dataset.csv', index=False)
-
-print("Vectorised dataset saved as 'E:\\saas-idea-validator\\data\\processed\\vectorised_dataset.csv'")
-
-
-
-if __name__ == "__main__":
-    print("This file is a straight conversion of preprocessV2.ipynb.")
-    print("Inspect and adapt the functions/variables for your reinforcement learning workflow.")
+from sklearn.feature_extraction.text import TfidfVectorizer
+
+logger = logging.getLogger(__name__)
+STOP_WORDS = set(stopwords.words('english'))
+
+class PreprocessingPipeline:
+    def __init__(self, vectorizer_type='tfidf', max_features=200, logger_obj=None):
+        self.vectorizer_type = vectorizer_type
+        self.max_features = max_features
+        self.logger = logger_obj or logger
+        self.vectorizer = None
+    
+    @staticmethod
+    def remove_urls(text):
+        if not isinstance(text, str):
+            return text
+        return re.sub(r'http\S+|www\S+|https\S+', '', text, flags=re.MULTILINE)
+    
+    @staticmethod
+    def remove_emojis(text):
+        if not isinstance(text, str):
+            return text
+        return emoji.replace_emoji(text, replace="")
+    
+    @staticmethod
+    def remove_punctuation(text):
+        if not isinstance(text, str):
+            return text
+        return text.translate(str.maketrans('', '', string.punctuation))
+    
+    @staticmethod
+    def remove_numbers(text):
+        if not isinstance(text, str):
+            return text
+        return re.sub(r'\d+', '', text)
+    
+    @staticmethod
+    def remove_special_characters(text):
+        if not isinstance(text, str):
+            return text
+        return re.sub(r'[^a-zA-Z0-9\s]', '', text)
+    
+    @staticmethod
+    def lowercase(text):
+        if not isinstance(text, str):
+            return text
+        return text.lower()
+    
+    @staticmethod
+    def tokenize(text):
+        if not isinstance(text, str):
+            return []
+        return word_tokenize(text)
+    
+    @staticmethod
+    def remove_stopwords(tokens):
+        return [token for token in tokens if token.lower() not in STOP_WORDS]
+    
+    def clean_text(self, text, remove_stopwords=True):
+        if not isinstance(text, str):
+            return []
+        
+        text = self.remove_urls(text)
+        text = self.remove_emojis(text)
+        text = self.remove_punctuation(text)
+        text = self.remove_numbers(text)
+        text = self.remove_special_characters(text)
+        text = self.lowercase(text)
+        
+        tokens = self.tokenize(text)
+        
+        if remove_stopwords:
+            tokens = self.remove_stopwords(tokens)
+        
+        tokens = [t for t in tokens if t.strip()]
+        
+        return tokens
+    
+    def fit_tfidf_vectorizer(self, texts):
+        self.logger.info(f"[PREPROCESSING] Fitting TF-IDF ({self.max_features} features)...")
+        
+        self.vectorizer = TfidfVectorizer(
+            max_features=self.max_features,
+            stop_words='english',
+            ngram_range=(1, 2),
+            min_df=2,
+            max_df=0.8,
+            sublinear_tf=True
+        )
+        
+        self.vectorizer.fit(texts)
+        self.logger.info(f"[PREPROCESSING] TF-IDF fitted")
+        return self.vectorizer
+    
+    def vectorize_tfidf(self, texts):
+        if self.vectorizer is None:
+            raise ValueError("Vectorizer not fitted")
+        
+        vectors = self.vectorizer.transform(texts)
+        return vectors.toarray()
+    
+    @staticmethod
+    def encode_labels(labels):
+        unique_labels = sorted(set(labels))
+        label_map = {label: idx for idx, label in enumerate(unique_labels)}
+        encoded = np.array([label_map[label] for label in labels])
+        return encoded, label_map
+    
+    def process_dataset(self, input_csv, output_csv=None, save_vectorizer=None):
+        self.logger.info(f"[PREPROCESSING] Processing {input_csv}")
+        errors = []
+        
+        try:
+            self.logger.info(f"[PREPROCESSING] Loading data...")
+            df = pd.read_csv(input_csv)
+            self.logger.info(f"[PREPROCESSING] Loaded {len(df)} rows")
+            
+            if 'text' not in df.columns or 'label' not in df.columns:
+                error_msg = "CSV must have 'text' and 'label' columns"
+                self.logger.error(f"[PREPROCESSING] {error_msg}")
+                return {'success': False, 'output_file': None, 'row_count': 0, 'vector_dim': 0, 'errors': [error_msg]}
+            
+            texts = df['text'].fillna('').astype(str)
+            labels = df['label']
+            
+            self.logger.info(f"[PREPROCESSING] Cleaning text...")
+            cleaned_tokens = [self.clean_text(text) for text in texts]
+            cleaned_texts = [' '.join(tokens) for tokens in cleaned_tokens]
+            
+            self.logger.info(f"[PREPROCESSING] Vectorizing...")
+            self.fit_tfidf_vectorizer(cleaned_texts)
+            vectors = self.vectorize_tfidf(cleaned_texts)
+            
+            self.logger.info(f"[PREPROCESSING] Vectors shape: {vectors.shape}")
+            
+            self.logger.info(f"[PREPROCESSING] Encoding labels...")
+            encoded_labels, label_map = self.encode_labels(labels)
+            self.logger.info(f"[PREPROCESSING] Labels: {label_map}")
+            
+            feature_cols = ['post_sentiment', 'avg_comment_sentiment', 'upvote_ratio', 'post_recency']
+            X_numeric = df[feature_cols].fillna(0).values
+            
+            X_combined = np.hstack([X_numeric, vectors])
+            
+            output_df = df[['post_id', 'title', 'text']].copy() if 'post_id' in df.columns else pd.DataFrame()
+            output_df['post_sentiment'] = df['post_sentiment']
+            output_df['avg_comment_sentiment'] = df['avg_comment_sentiment']
+            output_df['upvote_ratio'] = df['upvote_ratio']
+            output_df['post_recency'] = df.get('post_recency', 0.5)
+            output_df['label_numeric'] = encoded_labels
+            
+            vector_strs = [' '.join(map(str, vec)) for vec in vectors]
+            output_df['vector'] = vector_strs
+            
+            if output_csv is None:
+                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+                output_dir = 'data/processed'
+                os.makedirs(output_dir, exist_ok=True)
+                output_csv = os.path.join(output_dir, f"vectorised_dataset_{timestamp}.csv")
+            
+            output_df.to_csv(output_csv, index=False)
+            self.logger.info(f"[PREPROCESSING] ✓ Saved: {output_csv}")
+            
+            if save_vectorizer:
+                os.makedirs(os.path.dirname(save_vectorizer), exist_ok=True)
+                joblib.dump(self.vectorizer, save_vectorizer)
+                self.logger.info(f"[PREPROCESSING] Vectorizer saved")
+            
+            return {
+                'success': True,
+                'output_file': output_csv,
+                'row_count': len(output_df),
+                'vector_dim': vectors.shape[1],
+                'label_map': label_map,
+                'errors': errors
+            }
+        
+        except Exception as e:
+            error_msg = f"Error: {str(e)}"
+            self.logger.error(f"[PREPROCESSING] {error_msg}")
+            return {
+                'success': False,
+                'output_file': None,
+                'row_count': 0,
+                'vector_dim': 0,
+                'errors': [error_msg]
+            }
