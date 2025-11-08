@@ -33,6 +33,7 @@ scraper:
     - growthhacking
     - Bootstrapped
     - SaaS
+  subreddit: "SaaS"
   batch_size: 100
   max_batches: 10
   max_comments_per_post: 10
