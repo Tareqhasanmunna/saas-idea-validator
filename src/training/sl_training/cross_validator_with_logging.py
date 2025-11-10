@@ -33,7 +33,7 @@ class CrossValidatorWithLogging:
                 f.write(f"Accuracy: {acc:.4f}\nPrecision: {prec:.4f}\nRecall: {rec:.4f}\nF1: {f1:.4f}\n\n")
                 f.write("Confusion Matrix:\n")
                 f.write(np.array2string(cm))
-            
+
             fold_metrics.append({"accuracy": acc, "precision": prec, "recall": rec, "f1": f1})
 
         # Average metrics
