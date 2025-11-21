@@ -1,0 +1,40 @@
+# SaaS Idea Validator - Complete Requirements
+
+# Core Data Science
+numpy>=1.26.0
+pandas>=1.5.3
+scipy>=1.11.0
+
+# Machine Learning
+scikit-learn==1.3.0
+lightgbm>=4.0.0
+imbalanced-learn>=0.10.0
+
+# Deep Learning / Reinforcement Learning
+torch>=2.0.0
+gymnasium>=0.28.0
+
+# Optional: Advanced RL Algorithms
+stable-baselines3>=2.0.0
+
+# Visualization
+matplotlib>=3.7.0
+seaborn>=0.12.0
+plotly>=5.14.0
+
+# NLP / Embeddings
+sentence-transformers>=2.2.0
+
+# Data Storage & Config
+joblib>=1.3.0
+pyyaml>=6.0
+
+# Development & Testing
+jupyter>=1.0.0
+ipython>=8.10.0
+ipywidgets>=8.0.0
+pytest>=7.3.0
+pytest-cov>=4.1.0
+
+# Optional: Jupyter Lab Extensions
+jupyterlab>=4.0.0
