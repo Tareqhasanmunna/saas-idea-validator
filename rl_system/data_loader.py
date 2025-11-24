@@ -1,3 +1,14 @@
+"""
+Unified Data Loader for Pre-Vectorized Dataset
+
+Loads 100-dimensional vectors + 4 numeric features + label_numeric
+No text processing needed - data is already vectorized!
+
+Usage:
+    from data_loader import load_training_data
+    X, y = load_training_data()
+"""
+
 import os
 from pathlib import Path
 import logging
@@ -9,14 +20,14 @@ logger = logging.getLogger(__name__)
 
 
 class DataLoader:
-    """Load pre-vectorized balanced dataset"""
+    """Load pre-vectorized dataset"""
 
     DATASET_PATHS = [
-    r"E:\saas-idea-validator\data\processed\balanced\vectorized_features_balanced.csv",
-    "data/processed/balanced/vectorized_features_balanced.csv",
+        r"E:/saas-idea-validator/data/processed/vectorized_features.csv"
     ]
 
     TARGET_COLUMN = 'label_numeric'
+    EXPECTED_FEATURES = 104  # 100 vectors + 4 numeric features
 
     def __init__(self, custom_path: str = None):
         """Initialize data loader"""
@@ -36,7 +47,7 @@ class DataLoader:
             else:
                 raise FileNotFoundError(f"Custom dataset not found: {self.custom_path}")
 
-        logger.info("🔍 Searching for dataset...")
+        logger.info("Searching for dataset...")
         for path_str in self.DATASET_PATHS:
             path = Path(path_str)
             if path.exists():
@@ -49,17 +60,13 @@ class DataLoader:
         """Load and validate pre-vectorized dataset"""
         self.dataset_path = self.find_dataset()
 
-        logger.info(f"\n{'='*70}")
-        logger.info("LOADING DATASET")
-        logger.info(f"{'='*70}")
-        logger.info(f"Path: {self.dataset_path}")
-        
+        logger.info(f"Loading dataset from: {self.dataset_path}")
         try:
             df = pd.read_csv(self.dataset_path)
         except Exception as e:
             raise ValueError(f"Failed to read CSV: {e}")
 
-        logger.info(f"✓ Loaded: {df.shape[0]} samples × {df.shape[1]} features")
+        logger.info(f"Dataset shape: {df.shape[0]} rows × {df.shape[1]} columns")
 
         # Check target column exists
         if self.TARGET_COLUMN not in df.columns:
@@ -72,36 +79,28 @@ class DataLoader:
         X = df.drop(columns=[self.TARGET_COLUMN])
         y = df[self.TARGET_COLUMN]
 
-        logger.info(f"\n📊 Data Info:")
-        logger.info(f"   Features: {X.shape[1]}")
-        logger.info(f"   Samples: {X.shape[0]}")
+        logger.info(f"Features: {X.shape[1]}, Samples: {X.shape[0]}")
+        logger.info(f"Feature columns: {X.columns.tolist()[:5]}... (showing first 5)")
 
         # Check for missing values
         missing_X = X.isnull().sum().sum()
         missing_y = y.isnull().sum()
 
         if missing_X > 0 or missing_y > 0:
-            logger.warning(f"⚠️  Missing values - X: {missing_X}, y: {missing_y}")
+            logger.warning(f"Missing values - X: {missing_X}, y: {missing_y}")
             X = X.fillna(X.mean())
             mask = y.notna()
             X = X[mask]
             y = y[mask]
-            logger.info("   Filled/removed missing values")
+            logger.info("Filled/removed missing values")
 
         # Validate data types (should be numeric)
         non_numeric = X.select_dtypes(exclude=[np.number]).columns.tolist()
         if non_numeric:
             raise ValueError(f"Non-numeric columns found: {non_numeric}")
 
-        # Class distribution
-        logger.info(f"\n📊 Class Distribution:")
-        class_dist = y.value_counts().sort_index()
-        for class_id in class_dist.index:
-            count = class_dist[class_id]
-            pct = count / len(y) * 100
-            logger.info(f"   Class {class_id}: {count:5d} ({pct:5.1f}%)")
-
-        logger.info(f"\n✓ Dataset validated successfully\n")
+        logger.info("✓ Dataset validated successfully")
+        logger.info(f"Class distribution:\n{y.value_counts().to_string()}")
 
         self.X = X
         self.y = y
@@ -110,27 +109,6 @@ class DataLoader:
 
 
 def load_training_data(custom_path: str = None) -> Tuple[pd.DataFrame, pd.Series]:
-    """
-    Load pre-vectorized training data
-    
-    Args:
-        custom_path: Optional custom dataset path
-    
-    Returns:
-        (X, y) tuple of features and labels
-    """
+    """Load pre-vectorized training data"""
     loader = DataLoader(custom_path=custom_path)
     return loader.load()
-
-
-if __name__ == '__main__':
-    # Test the loader
-    logging.basicConfig(level=logging.INFO, format='%(levelname)s - %(message)s')
-    
-    try:
-        X, y = load_training_data()
-        print(f"\n✅ Successfully loaded dataset!")
-        print(f"   X shape: {X.shape}")
-        print(f"   y shape: {y.shape}")
-    except Exception as e:
-        print(f"\n❌ Error: {e}")

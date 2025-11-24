@@ -1,141 +1,86 @@
-"""
-RL Environment for SaaS Idea Validator
-
-Simulates the environment where the RL agent makes decisions (predictions)
-and receives rewards based on ground-truth labels from the dataset.
-
-Usage:
-    env = SaaSValidatorEnvironment(X, y)
-    state = env.reset()
-    action, prob = agent.get_action(state)
-    next_state, reward, done, info = env.step(action)
-"""
+# env_wrapper.py
+# Simple environment wrapper over a supervised dataset treated as episodic RL.
+# Each episode = one sample (state = feature vector, agent selects class action).
+# Returns reward based on prediction correctness + optional shaping.
 
 import numpy as np
-from typing import Tuple, Dict
+from typing import Tuple, Dict, List
+import random
 
+class DatasetEnv:
+    """
+    Episodic env where each episode is one sample from dataset.
+    action: integer 0..(n_classes-1)
+    observation: 1D numpy array (feature vector)
+    reward: shaped per config
+    """
+    def __init__(self, X: np.ndarray, y: np.ndarray, n_classes:int,
+                 class_weights:List[float]=None,
+                 success_bonus:float=0.0,
+                 correct_reward:float=1.0,
+                 wrong_reward:float=-0.5,
+                 seed:int=0):
+        assert X.shape[0] == y.shape[0]
+        self.X = X.astype(np.float32)
+        self.y = y.astype(np.int64)
+        self.n_classes = n_classes
+        self.n = X.shape[0]
+        self.indices = list(range(self.n))
+        self.rng = random.Random(seed)
+        self.class_weights = np.array(class_weights) if class_weights is not None else np.ones(n_classes, dtype=np.float32)
+        self.success_bonus = success_bonus
+        self.correct_reward = correct_reward
+        self.wrong_reward = wrong_reward
+        self.curr_idx = 0
+        self._permute()
 
-class SaaSValidatorEnvironment:
-    """Environment for RL agent interaction"""
-
-    def __init__(self, X: np.ndarray, y: np.ndarray, reward_scheme: str = 'accuracy'):
-        """
-        Initialize environment
-
-        Args:
-            X: Feature matrix (n_samples, n_features)
-            y: Target labels (n_samples,)
-            reward_scheme: 'accuracy', 'f1', or 'balanced'
-        """
-        self.X = X
-        self.y = y
-        self.reward_scheme = reward_scheme
-        self.n_samples = X.shape[0]
-        self.n_features = X.shape[1]
-        self.current_idx = 0
-        self.episode_steps = 0
-        self.max_steps = self.n_samples
-
-        # Track statistics
-        self.episode_rewards = []
-        self.episode_accuracies = []
-        self.episode_correct_predictions = 0
+    def _permute(self):
+        self.rng.shuffle(self.indices)
+        self.curr_idx = 0
 
     def reset(self) -> np.ndarray:
-        """Reset environment for new episode"""
-        self.current_idx = 0
-        self.episode_steps = 0
-        self.episode_rewards = []
-        self.episode_accuracies = []
-        self.episode_correct_predictions = 0
+        if self.curr_idx >= self.n:
+            self._permute()
+        idx = self.indices[self.curr_idx]
+        self.curr_idx += 1
+        self._last_idx = idx
+        return self.X[idx].copy()
 
-        return self.X.iloc[self.current_idx]
-
-    def step(self, action: int) -> Tuple[np.ndarray, float, bool, Dict]:
+    def step(self, action:int) -> Tuple[np.ndarray, float, bool, Dict]:
         """
-        Execute one step in environment
-
-        Args:
-            action: Predicted class label (0, 1, or 2)
-
-        Returns:
-            next_state: Next feature vector
-            reward: Reward signal for this action
-            done: Whether episode is complete
-            info: Additional information
+        Action is predicted class index.
+        Return next_obs (we'll return zeros since episode ends after one step),
+        reward, done (True), info dict with label and correctness.
         """
-        true_label = self.y.iloc[self.current_idx] if hasattr(self.y, 'iloc') else self.y[self.current_idx]
+        true_label = int(self.y[self._last_idx])
+        correct = int(action == true_label)
+        weight = float(self.class_weights[true_label])
+        reward = (self.correct_reward if correct else self.wrong_reward) * weight
+        if correct:
+            reward += self.success_bonus
+        info = {"true_label": true_label, "correct": bool(correct)}
+        done = True
+        # observation: return zero vector (episode ends) to keep simple; agent should act on reset
+        next_obs = np.zeros_like(self.X[self._last_idx], dtype=np.float32)
+        return next_obs, float(reward), done, info
 
-        # Compute reward based on prediction correctness
-        is_correct = (action == true_label)
-        reward = self._compute_reward(action, true_label, is_correct)
-
-        if is_correct:
-            self.episode_correct_predictions += 1
-
-        self.episode_rewards.append(reward)
-        self.episode_steps += 1
-        self.current_idx += 1
-
-        done = (self.current_idx >= self.n_samples)
-
-        # Get next state or terminal state
-        if done:
-            next_state = np.zeros(self.n_features)  # Terminal state
-        else:
-            next_state = self.X.iloc[self.current_idx] if not isinstance(self.X, np.ndarray) else self.X[self.current_idx]
-
-        info = {
-            'true_label': true_label,
-            'predicted_label': action,
-            'is_correct': is_correct,
-            'episode_accuracy': self.episode_correct_predictions / self.episode_steps,
-        }
-
-        return next_state, reward, done, info
-
-    def _compute_reward(self, action: int, true_label: int, is_correct: bool) -> float:
+    def sample_balanced_batch_indices(self, batch_size:int):
         """
-        Compute reward based on prediction
-
-        Reward scheme options:
-        - accuracy: +1 for correct, -0.5 for incorrect
-        - f1: +1 for correct, varying penalty by class
-        - balanced: Class-balanced rewards
+        Returns indices for a balanced batch: attempts to sample equally across classes.
         """
-        if self.reward_scheme == 'accuracy':
-            return 1.0 if is_correct else -0.5
+        per_class = max(1, batch_size // self.n_classes)
+        sel = []
+        for c in range(self.n_classes):
+            cls_idx = np.where(self.y == c)[0]
+            if len(cls_idx) == 0:
+                continue
+            chosen = np.random.choice(cls_idx, size=per_class, replace=len(cls_idx) < per_class)
+            sel.extend(chosen.tolist())
+        if len(sel) < batch_size:
+            more = np.random.choice(self.n, size=(batch_size - len(sel)), replace=True)
+            sel.extend(more.tolist())
+        np.random.shuffle(sel)
+        return sel[:batch_size]
 
-        elif self.reward_scheme == 'f1':
-            # Higher reward for correct predictions of minority class (0)
-            if is_correct:
-                if true_label == 0:
-                    return 2.0  # Reward for correctly identifying rare class
-                else:
-                    return 1.0
-            else:
-                if true_label == 0:
-                    return -2.0  # Penalty for missing rare class
-                else:
-                    return -0.5
-
-        elif self.reward_scheme == 'balanced':
-            # Class-balanced rewards
-            class_weights = {0: 2.0, 1: 1.0, 2: 1.0}  # Weight minority class higher
-            weight = class_weights.get(true_label, 1.0)
-            return weight if is_correct else -weight * 0.5
-
-        else:
-            return 1.0 if is_correct else -0.5
-
-    def get_episode_summary(self) -> Dict:
-        """Get summary statistics for current episode"""
-        if len(self.episode_rewards) == 0:
-            return {'episode_reward': 0, 'episode_accuracy': 0}
-
-        return {
-            'episode_reward': np.mean(self.episode_rewards),
-            'total_reward': np.sum(self.episode_rewards),
-            'episode_accuracy': self.episode_correct_predictions / self.episode_steps,
-            'steps': self.episode_steps,
-        }
+    def get_all(self):
+        return self.X.copy(), self.y.copy()

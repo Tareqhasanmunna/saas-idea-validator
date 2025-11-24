@@ -28,3 +28,11 @@ ipywidgets>=8.0.0
 # Code Quality and Testing
 pytest>=7.3.0
 pytest-cov>=4.1.0
+
+# Deep Learning / Reinforcement Learning
+torch>=2.0.0
+gymnasium>=0.28.0
+
+# Optional: Advanced RL Algorithms
+stable-baselines3>=2.0.0
+
