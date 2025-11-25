@@ -44,7 +44,7 @@ logger = logging.getLogger(__name__)
 
 CONFIG = {
     'data_path': r"E:\saas-idea-validator\data\processed\balanced\vectorized_features_balanced.csv",
-    'output_base': Path('ml_outputs_thesis'),
+    'output_base': Path('models'),
     'n_splits': 10,
     'test_size': 0.2,
     'random_state': 42,
