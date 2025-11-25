@@ -1,6 +1,6 @@
 {
   "model_name": "DecisionTree",
-  "timestamp": "2025-11-24T15:17:32.920208",
+  "timestamp": "2025-11-25T18:38:56.794715",
   "cv_results": {
     "accuracy_mean": 0.7783707531480162,
     "accuracy_std": 0.019410746651797903,

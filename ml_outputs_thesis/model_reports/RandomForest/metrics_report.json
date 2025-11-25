@@ -1,6 +1,6 @@
 {
   "model_name": "RandomForest",
-  "timestamp": "2025-11-24T15:17:37.590449",
+  "timestamp": "2025-11-25T18:39:01.390853",
   "cv_results": {
     "accuracy_mean": 0.7548586362556428,
     "accuracy_std": 0.041305998408531705,

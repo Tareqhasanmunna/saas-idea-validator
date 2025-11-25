@@ -1,6 +1,6 @@
 {
   "model_name": "LogisticRegression",
-  "timestamp": "2025-11-24T15:17:35.359733",
+  "timestamp": "2025-11-25T18:38:59.224413",
   "cv_results": {
     "accuracy_mean": 0.7019363269185079,
     "accuracy_std": 0.023880228205436747,

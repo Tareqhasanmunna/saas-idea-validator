@@ -1,0 +1,37 @@
+{
+  "DecisionTree": {
+    "cv_accuracy": 0.7658172962698979,
+    "test_accuracy": 0.8231441048034934,
+    "gap": -0.05732680853359551,
+    "gap_pct": -7.485703027709073,
+    "status": "[UNDERFITTING]"
+  },
+  "LogisticRegression": {
+    "cv_accuracy": 0.7019363269185079,
+    "test_accuracy": 0.6746724890829694,
+    "gap": 0.02726383783553854,
+    "gap_pct": 3.8840898796656473,
+    "status": "[GOOD] GENERALIZATION"
+  },
+  "RandomForest": {
+    "cv_accuracy": 0.750484081729627,
+    "test_accuracy": 0.7794759825327511,
+    "gap": -0.028991900803124082,
+    "gap_pct": -3.86309336985629,
+    "status": "[GOOD] GENERALIZATION"
+  },
+  "GradientBoosting": {
+    "cv_accuracy": 0.8301971964837254,
+    "test_accuracy": 0.868995633187773,
+    "gap": -0.03879843670404759,
+    "gap_pct": -4.673400111247926,
+    "status": "[GOOD] GENERALIZATION"
+  },
+  "LightGBM": {
+    "cv_accuracy": 0.8465995485863627,
+    "test_accuracy": 0.8558951965065502,
+    "gap": -0.009295647920187555,
+    "gap_pct": -1.0979982136429518,
+    "status": "[GOOD] GENERALIZATION"
+  }
+}

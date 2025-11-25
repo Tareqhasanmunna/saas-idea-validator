@@ -20,7 +20,7 @@ from sklearn.metrics import (
     roc_auc_score, confusion_matrix, classification_report,
     roc_curve, auc
 )
-from typing import Dict, Tuple
+from typing import Dict
 import json
 
 
@@ -66,22 +66,28 @@ class ModelEvaluator:
 
         y_test_array = self.y_test if isinstance(self.y_test, np.ndarray) else self.y_test.values
 
-        # ✓ Calculate all metrics
+        # Calculate metrics
         accuracy = accuracy_score(y_test_array, self.predictions)
         precision = precision_score(y_test_array, self.predictions, average='weighted', zero_division=0)
         recall = recall_score(y_test_array, self.predictions, average='weighted', zero_division=0)
         f1 = f1_score(y_test_array, self.predictions, average='weighted', zero_division=0)
-        roc_auc = roc_auc_score(y_test_array, self.probabilities, multi_class='ovr')
+        
+        # Handle binary vs multiclass ROC-AUC
+        n_classes = len(np.unique(y_test_array))
+        if n_classes == 2:
+            roc_auc = roc_auc_score(y_test_array, self.probabilities[:, 1])
+        else:
+            roc_auc = roc_auc_score(y_test_array, self.probabilities, multi_class='ovr')
 
-        # ✓ Confusion Matrix
+        # Confusion Matrix
         cm = confusion_matrix(y_test_array, self.predictions)
 
-        # ✓ Per-class metrics
+        # Per-class metrics
         class_report = classification_report(y_test_array, self.predictions, output_dict=True, zero_division=0)
         
-        # ✅ USE roc_curve and auc
+        # ROC curves for each class
         roc_curves = {}
-        for i in range(len(np.unique(y_test_array))):
+        for i in range(n_classes):
             y_test_binary = (y_test_array == i).astype(int)
             fpr, tpr, _ = roc_curve(y_test_binary, self.probabilities[:, i])
             roc_auc_score_val = auc(fpr, tpr)
@@ -91,19 +97,17 @@ class ModelEvaluator:
                 'auc': float(roc_auc_score_val)
             }
 
-
         self.metrics = {
             'model_name': self.model_name,
             'accuracy': float(accuracy),
-            'precision': float(precision),           # ✓ NEW
-            'recall': float(recall),                 # ✓ NEW
+            'precision': float(precision),
+            'recall': float(recall),
             'f1': float(f1),
             'roc_auc': float(roc_auc),
-            'confusion_matrix': cm.tolist(),         # ✓ NEW
+            'confusion_matrix': cm.tolist(),
             'cm_shape': cm.shape,
             'classification_report': class_report,
             'roc_curves': roc_curves,
-   # ✓ NEW
         }
 
         return self.metrics
@@ -117,17 +121,21 @@ class ModelEvaluator:
         print(f"Model Evaluation: {self.model_name}")
         print(f"{'='*70}")
         print(f"Accuracy:  {self.metrics['accuracy']:.4f}")
-        print(f"Precision: {self.metrics['precision']:.4f}")  # ✓ NEW
-        print(f"Recall:    {self.metrics['recall']:.4f}")     # ✓ NEW
+        print(f"Precision: {self.metrics['precision']:.4f}")
+        print(f"Recall:    {self.metrics['recall']:.4f}")
         print(f"F1-Score:  {self.metrics['f1']:.4f}")
         print(f"ROC-AUC:   {self.metrics['roc_auc']:.4f}")
 
-        print(f"\nConfusion Matrix (3×3):")  # ✓ NEW
+        print(f"\nConfusion Matrix:")
         cm = np.array(self.metrics['confusion_matrix'])
         print(cm)
 
-        print(f"\nPer-Class Metrics:")  # ✓ NEW
-        for class_id in ['0', '1', '2']:
+        # Dynamic class labels
+        print(f"\nPer-Class Metrics:")
+        class_ids = sorted(self.metrics['classification_report'].keys())
+        class_ids = [c for c in class_ids if c not in ['accuracy', 'macro avg', 'weighted avg']]
+        
+        for class_id in class_ids:
             class_metrics = self.metrics['classification_report'].get(class_id, {})
             if class_metrics:
                 print(f"  Class {class_id}: Precision={class_metrics.get('precision', 0):.4f}, "
@@ -148,14 +156,16 @@ class ModelEvaluator:
         cm = np.array(self.metrics['confusion_matrix'])
         analysis = {}
 
-        for i in range(3):  # 3 classes: Bad, Neutral, Good
+        # Dynamic number of classes
+        n_classes = cm.shape[0]
+        
+        for i in range(n_classes):
             tp = cm[i, i]
             fp = cm[:, i].sum() - tp
             fn = cm[i, :].sum() - tp
             tn = cm.sum() - tp - fp - fn
 
-            class_names = {0: 'Bad', 1: 'Neutral', 2: 'Good'}
-            analysis[class_names[i]] = {
+            analysis[f'Class_{i}'] = {
                 'true_positives': int(tp),
                 'false_positives': int(fp),
                 'false_negatives': int(fn),
@@ -239,8 +249,8 @@ def evaluate_multiple_models(models: Dict, scaler, X_test: np.ndarray, y_test: n
         result = {
             'Model': model_name,
             'Accuracy': metrics['accuracy'],
-            'Precision': metrics['precision'],          # ✓ NEW
-            'Recall': metrics['recall'],                # ✓ NEW
+            'Precision': metrics['precision'],
+            'Recall': metrics['recall'],
             'F1': metrics['f1'],
             'ROC_AUC': metrics['roc_auc'],
         }

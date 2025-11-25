@@ -1,6 +1,6 @@
 {
   "model_name": "GradientBoosting",
-  "timestamp": "2025-11-24T15:17:40.073981",
+  "timestamp": "2025-11-25T18:39:03.801339",
   "cv_results": {
     "accuracy_mean": 0.830212045616536,
     "accuracy_std": 0.03210326317237506,

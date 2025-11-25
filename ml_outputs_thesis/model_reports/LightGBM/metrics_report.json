@@ -1,6 +1,6 @@
 {
   "model_name": "LightGBM",
-  "timestamp": "2025-11-24T15:17:42.323988",
+  "timestamp": "2025-11-25T18:39:05.979918",
   "cv_results": {
     "accuracy_mean": 0.8443989071038253,
     "accuracy_std": 0.027687883370730377,
