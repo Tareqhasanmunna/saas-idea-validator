@@ -6,6 +6,7 @@
 paths:
   raw_data_dir: data/raw/raw_batch                   # incoming batch CSVs
   raw_batch_report_dir: data/raw/raw_batch_report
+  raw_data_file: data.csv                           # combined raw data
   raw_merged_dir: data/raw/raw_merged                # merged outputs
   processed_data_dir: data/processed                 # preprocessed outputs
   fold_info_dir: data/fold_info

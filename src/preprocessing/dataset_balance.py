@@ -20,7 +20,7 @@ logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(
 logger = logging.getLogger(__name__)
 
 # ========== CONFIGURATION ==========
-DATASET_PATH = r"E:\saas-idea-validator\data\processed\vectorized_features.csv"
+DATASET_PATH = r"E:\saas-idea-validator\data\processed\vectorized_features_full_fixed.csv"
 OUTPUT_DIR = Path(r"E:\saas-idea-validator\data\processed\balanced")
 OUTPUT_FILE = OUTPUT_DIR / "vectorized_features_balanced.csv"
 
