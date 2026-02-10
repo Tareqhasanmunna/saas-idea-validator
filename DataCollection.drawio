@@ -1,0 +1,85 @@
+<mxfile host="65bd71144e">
+    <diagram id="CollectionFlow" name="Data Collection Pipeline">
+        <mxGraphModel dx="1143" dy="566" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="850" pageHeight="1100" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="9" style="edgeStyle=none;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="script_node" target="loop_container" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="10" value="&lt;span style=&quot;color: rgb(63, 63, 63); font-size: 16px;&quot;&gt;Start Batch&lt;/span&gt;" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" parent="9" vertex="1" connectable="0">
+                    <mxGeometry x="0.0667" relative="1" as="geometry">
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="script_node" value="&lt;font style=&quot;font-size: 16px;&quot;&gt;Reddit Scraper&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=14;verticalAlign=top;spacingTop=10;" parent="1" vertex="1">
+                    <mxGeometry x="365" y="30" width="180" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="config_node" value="&lt;font style=&quot;font-size: 16px;&quot;&gt;config.yaml&lt;br&gt;(Thresholds)&lt;/font&gt;" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;fillColor=#fff2cc;strokeColor=#d6b656;size=15;fontSize=12;" parent="1" vertex="1">
+                    <mxGeometry x="210" y="30" width="100" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="loop_container" value="&lt;font style=&quot;font-size: 16px;&quot;&gt;ACQUISITION LOOP (Per Post)&lt;/font&gt;" style="swimlane;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontStyle=1;startSize=30;align=left;" parent="1" vertex="1">
+                    <mxGeometry x="250" y="170" width="410" height="490" as="geometry"/>
+                </mxCell>
+                <mxCell id="fetch_node" value="&lt;font style=&quot;font-size: 16px;&quot;&gt;Fetch Reddit Post&lt;br&gt;(Title + Body + Comments)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;" parent="loop_container" vertex="1">
+                    <mxGeometry x="105" y="50" width="200" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="filter_node" value="&lt;font style=&quot;font-size: 16px;&quot;&gt;&lt;b&gt;Filter: Comments &amp;lt; 3?&lt;/b&gt;&lt;/font&gt;" style="rhombus;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" parent="loop_container" vertex="1">
+                    <mxGeometry x="108.75" y="130" width="192.5" height="180" as="geometry"/>
+                </mxCell>
+                <mxCell id="hf_node" value="&lt;font style=&quot;font-size: 16px;&quot;&gt;Hugging Face Pipeline&lt;br&gt;(DistilBERT)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;" parent="loop_container" vertex="1">
+                    <mxGeometry x="105" y="360" width="200" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="math_node" value="&lt;font style=&quot;font-size: 16px;&quot;&gt;Normalize Score&lt;br&gt;(Section D Formula)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" parent="loop_container" vertex="1">
+                    <mxGeometry x="105" y="430" width="200" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="edge_3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="loop_container" source="fetch_node" target="filter_node" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="edge_yes" value="&lt;font style=&quot;font-size: 16px;&quot;&gt;Pass&lt;/font&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#009900;" parent="loop_container" source="filter_node" target="hf_node" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="edge_4" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="loop_container" source="hf_node" target="math_node" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="batch_container" value="&lt;font style=&quot;font-size: 16px;&quot;&gt;BATCH REFINEMENT&lt;/font&gt;" style="swimlane;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;startSize=30;align=left;" parent="1" vertex="1">
+                    <mxGeometry x="275" y="710" width="360" height="260" as="geometry">
+                        <mxRectangle x="250" y="600" width="160" height="30" as="alternateBounds"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="impute_node" value="&lt;font style=&quot;font-size: 16px;&quot;&gt;Stochastic Imputation&lt;br&gt;(Mean + Noise)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;" parent="batch_container" vertex="1">
+                    <mxGeometry x="80" y="50" width="200" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="weight_node" value="&lt;font style=&quot;font-size: 16px;&quot;&gt;AutomatedWeightValidator&lt;br&gt;(Find Optimal Weights)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#000000;" parent="batch_container" vertex="1">
+                    <mxGeometry x="55" y="120" width="250" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="output_node" value="&lt;font style=&quot;font-size: 16px;&quot;&gt;Save CSV&lt;br&gt;(raw_data_x.csv)&lt;/font&gt;" style="shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;fillColor=#d5e8d4;strokeColor=#82b366;size=15;fontSize=12;fontStyle=1" parent="batch_container" vertex="1">
+                    <mxGeometry x="100" y="190" width="160" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="edge_5" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="batch_container" source="impute_node" target="weight_node" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="edge_6" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="batch_container" source="weight_node" target="output_node" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="edge_1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" parent="1" source="config_node" target="script_node" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="6" style="edgeStyle=none;html=1;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="math_node" target="batch_container" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="7" value="&lt;span style=&quot;color: rgb(63, 63, 63); font-size: 16px;&quot;&gt;Batch Full&lt;/span&gt;" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];" parent="6" vertex="1" connectable="0">
+                    <mxGeometry x="-0.2" relative="1" as="geometry">
+                        <mxPoint y="6" as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="discard_node" value="&lt;font style=&quot;font-size: 16px;&quot;&gt;Discard Post&lt;/font&gt;" style="ellipse;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" parent="1" vertex="1">
+                    <mxGeometry x="620" y="353.75" width="110" height="72.5" as="geometry"/>
+                </mxCell>
+                <mxCell id="edge_no" value="&lt;font style=&quot;font-size: 16px;&quot;&gt;Fail&lt;/font&gt;" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#FF0000;" parent="1" source="filter_node" target="discard_node" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>
